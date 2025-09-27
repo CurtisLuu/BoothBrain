@@ -1,75 +1,49 @@
-import React, { useState } from 'react';
-import { Trophy, BarChart3, Star } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, BarChart3, Star, RefreshCw } from 'lucide-react';
 import GameCard from './components/GameCard';
+import footballApi from './services/footballApi';
 
 function App() {
   const [activeTab, setActiveTab] = useState('nfl');
+  const [nflGames, setNflGames] = useState([]);
+  const [ncaaGames, setNcaaGames] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const nflGames = [
-    {
-      id: 1,
-      homeTeam: 'Kansas City Chiefs',
-      awayTeam: 'Buffalo Bills',
-      homeScore: 24,
-      awayScore: 17,
-      status: 'Final',
-      time: '4:25 PM ET',
-      week: 'Week 6'
-    },
-    {
-      id: 2,
-      homeTeam: 'Philadelphia Eagles',
-      awayTeam: 'Dallas Cowboys',
-      homeScore: 28,
-      awayScore: 23,
-      status: 'Final',
-      time: '8:20 PM ET',
-      week: 'Week 6'
-    },
-    {
-      id: 3,
-      homeTeam: 'Miami Dolphins',
-      awayTeam: 'New York Jets',
-      homeScore: 31,
-      awayScore: 21,
-      status: 'Final',
-      time: '1:00 PM ET',
-      week: 'Week 6'
-    }
-  ];
+  // Load games when component mounts or tab changes
+  useEffect(() => {
+    loadGames();
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ncaaGames = [
-    {
-      id: 1,
-      homeTeam: 'Georgia Bulldogs',
-      awayTeam: 'Alabama Crimson Tide',
-      homeScore: 27,
-      awayScore: 24,
-      status: 'Final',
-      time: '3:30 PM ET',
-      week: 'Week 7'
-    },
-    {
-      id: 2,
-      homeTeam: 'Ohio State Buckeyes',
-      awayTeam: 'Michigan Wolverines',
-      homeScore: 30,
-      awayScore: 27,
-      status: 'Final',
-      time: '12:00 PM ET',
-      week: 'Week 7'
-    },
-    {
-      id: 3,
-      homeTeam: 'USC Trojans',
-      awayTeam: 'UCLA Bruins',
-      homeScore: 35,
-      awayScore: 28,
-      status: 'Final',
-      time: '7:30 PM ET',
-      week: 'Week 7'
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadGames();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadGames = async () => {
+    setLoading(true);
+    try {
+      console.log('Loading games for:', activeTab);
+      if (activeTab === 'nfl') {
+        const games = await footballApi.getNFLGames();
+        console.log('NFL games loaded:', games);
+        setNflGames(games);
+      } else {
+        const games = await footballApi.getNCAAGames();
+        console.log('NCAA games loaded:', games);
+        setNcaaGames(games);
+      }
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error loading games:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const currentGames = activeTab === 'nfl' ? nflGames : ncaaGames;
 
@@ -149,19 +123,53 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-2xl font-bold text-black">
-              {activeTab === 'nfl' ? 'NFL Games' : 'NCAA Games'}
+              {activeTab === 'nfl' ? 'NFL Games' : 'NCAA Games'} ({currentGames.length})
             </h3>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <Trophy className="w-4 h-4" />
-              <span>Live Updates</span>
+            <div className="flex items-center space-x-4">
+              {lastUpdated && (
+                <div className="text-sm text-gray-500">
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </div>
+              )}
+              <button
+                onClick={loadGames}
+                disabled={loading}
+                className="flex items-center space-x-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span>{loading ? 'Loading...' : 'Refresh'}</span>
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentGames.map((game) => (
-              <GameCard key={game.id} game={game} league={activeTab} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center space-x-3">
+                <RefreshCw className="w-6 h-6 animate-spin text-primary-600" />
+                <span className="text-lg text-gray-600">Loading games...</span>
+              </div>
+            </div>
+          ) : currentGames.length === 0 ? (
+            <div className="text-center py-12">
+              <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h4 className="text-xl font-semibold text-gray-600 mb-2">No Games Available</h4>
+              <p className="text-gray-500 mb-4">
+                No {activeTab.toUpperCase()} games found for today. Try refreshing or check back later.
+              </p>
+              <button
+                onClick={loadGames}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                Refresh Games
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {currentGames.map((game) => (
+                <GameCard key={game.id} game={game} league={activeTab} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
