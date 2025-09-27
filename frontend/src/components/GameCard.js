@@ -9,6 +9,37 @@ const GameCard = ({ game, league }) => {
     return league === 'nfl' ? 'bg-football-nfl' : 'bg-football-ncaa';
   };
 
+  const formatGameDate = (dateString) => {
+    if (!dateString || dateString === 'TBD') return 'TBD';
+    
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Check if it's today, tomorrow, or yesterday
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Tomorrow';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        // Format as "Mon, Oct 15" for game cards
+        return date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    } catch (error) {
+      return dateString; // Return original if parsing fails
+    }
+  };
+
   const handleViewStats = () => {
     navigate('/stats', { state: { game: { ...game, league } } });
   };
@@ -18,13 +49,15 @@ const GameCard = ({ game, league }) => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <div className={`w-3 h-3 rounded-full ${getLeagueBg(league)}`}></div>
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{game.week}</span>
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            {game.week && game.week.toString().includes('Week') ? game.week : `Week ${game.week || 1}`}
+          </span>
         </div>
         <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
           <Clock className="w-4 h-4" />
           <span>{game.time}</span>
           <span className="text-gray-400 dark:text-gray-500">•</span>
-          <span>{game.date}</span>
+          <span>{formatGameDate(game.date)}</span>
         </div>
       </div>
 
