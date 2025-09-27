@@ -72,6 +72,21 @@ football.ai/
 4. **Access the application**:
    Open [http://localhost:3000](http://localhost:3000) in your browser
 
+### **Quick Start (All Platforms)**
+
+**Windows:**
+```bash
+# Double-click or run:
+start.bat
+```
+
+**Linux/macOS:**
+```bash
+# Make executable and run:
+chmod +x start.sh
+./start.sh
+```
+
 ### **Backend Setup (Optional)**
 
 The PDF.js editor works without a backend, but for advanced features, you can run the Python backend:

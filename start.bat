@@ -3,7 +3,7 @@ echo Starting Football AI Application...
 echo.
 
 echo Starting Frontend (React)...
-start "Frontend" cmd /k "cd frontend && npm start"
+start "Frontend" cmd /k "cd /d %~dp0frontend && npm start"
 
 echo.
 echo Waiting 5 seconds for frontend to start...
@@ -11,7 +11,7 @@ timeout /t 5 /nobreak >nul
 
 echo.
 echo Starting Backend (Python)...
-start "Backend" cmd /k "cd backend && python main.py"
+start "Backend" cmd /k "cd /d %~dp0backend && python main.py"
 
 echo.
 echo Application started!
