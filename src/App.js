@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Football, Trophy, BarChart3, MessageCircle, Star } from 'lucide-react';
-import ChatWidget from './components/ChatWidget';
+import { Trophy, BarChart3, Star } from 'lucide-react';
 import GameCard from './components/GameCard';
 
 function App() {
@@ -82,7 +81,7 @@ function App() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <div className="flex items-center justify-center w-10 h-10 bg-primary-600 rounded-lg">
-                <Football className="w-6 h-6 text-white" />
+                <Trophy className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Football AI</h1>
@@ -111,14 +110,22 @@ function App() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-16 bg-gradient-to-r from-primary-600 to-primary-700">
+      <section 
+        className="hero-section"
+        style={{
+          background: 'linear-gradient(to right, #0ea5e9, #0369a1)',
+          minHeight: '400px',
+          paddingTop: '4rem',
+          paddingBottom: '4rem'
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
             AI-Powered Football Analytics
           </h2>
           <p className="text-xl text-primary-100 mb-8 max-w-3xl mx-auto">
             Get instant insights, stats, and fun facts about your favorite {activeTab.toUpperCase()} games. 
-            Chat with our AI to discover the stories behind the plays.
+            Discover the stories behind the plays with our advanced analytics.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
@@ -126,8 +133,8 @@ function App() {
               <span className="text-white font-medium">Live Stats</span>
             </div>
             <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
-              <MessageCircle className="w-5 h-5 text-white" />
-              <span className="text-white font-medium">AI Chat</span>
+              <Trophy className="w-5 h-5 text-white" />
+              <span className="text-white font-medium">Game Analysis</span>
             </div>
             <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
               <Star className="w-5 h-5 text-white" />
@@ -183,11 +190,11 @@ function App() {
 
             <div className="text-center">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-8 h-8 text-primary-600" />
+                <Star className="w-8 h-8 text-primary-600" />
               </div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">AI Chat Assistant</h4>
+              <h4 className="text-xl font-semibold text-gray-900 mb-2">Advanced Analytics</h4>
               <p className="text-gray-600">
-                Ask questions about games, players, and strategies. Get personalized insights and fun facts.
+                Deep dive into player performance, team statistics, and historical data with our comprehensive analytics.
               </p>
             </div>
 
@@ -204,8 +211,6 @@ function App() {
         </div>
       </section>
 
-      {/* Chat Widget */}
-      <ChatWidget />
     </div>
   );
 }
