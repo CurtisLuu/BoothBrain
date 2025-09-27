@@ -40,10 +40,21 @@ npm start
 ## Tech Stack
 
 - **React 18**: Modern React with hooks
-- **Cedar-OS**: AI chat integration framework
 - **Tailwind CSS**: Utility-first CSS framework
 - **Lucide React**: Beautiful icon library
-- **Vite**: Fast build tool and dev server
+- **React Scripts**: Build tool and dev server
+
+## Cedar-OS Integration
+
+This project is designed to integrate with Cedar-OS for AI chat functionality. Currently, it includes a mock chat system that simulates AI responses. When Cedar-OS packages become available, you can:
+
+1. Install Cedar-OS packages:
+   ```bash
+   npm install @cedar-ai/react @cedar-ai/core
+   ```
+
+2. Replace the mock ChatWidget with Cedar-OS components
+3. Connect to your preferred AI backend (OpenAI, Anthropic, etc.)
 
 ## Project Structure
 

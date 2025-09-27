@@ -1,11 +1,7 @@
 import React from 'react';
-import { Clock, MapPin, TrendingUp } from 'lucide-react';
+import { Clock, TrendingUp } from 'lucide-react';
 
 const GameCard = ({ game, league }) => {
-  const getLeagueColor = (league) => {
-    return league === 'nfl' ? 'text-football-nfl' : 'text-football-ncaa';
-  };
-
   const getLeagueBg = (league) => {
     return league === 'nfl' ? 'bg-football-nfl' : 'bg-football-ncaa';
   };
