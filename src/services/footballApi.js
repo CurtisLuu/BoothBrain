@@ -245,6 +245,32 @@ class FootballApiService {
     }
   }
 
+  // Get comprehensive game boxscore with all player statistics
+  async getGameBoxscore(gameId, league) {
+    try {
+      console.log(`Fetching game boxscore for ${gameId} in ${league}...`);
+      const boxscore = await sportsApiService.getGameBoxscore(gameId, league);
+      console.log(`Game boxscore for ${gameId} fetched:`, boxscore);
+      return boxscore;
+    } catch (error) {
+      console.error(`Error fetching game boxscore for ${gameId}:`, error);
+      return null;
+    }
+  }
+
+  // Get play-by-play data for detailed game information
+  async getGamePlayByPlay(gameId, league) {
+    try {
+      console.log(`Fetching play-by-play for ${gameId} in ${league}...`);
+      const playByPlay = await sportsApiService.getGamePlayByPlay(gameId, league);
+      console.log(`Play-by-play for ${gameId} fetched:`, playByPlay);
+      return playByPlay;
+    } catch (error) {
+      console.error(`Error fetching play-by-play for ${gameId}:`, error);
+      return null;
+    }
+  }
+
   // Get NCAA games by specific week
   async getNCAAGamesByWeek(week) {
     try {

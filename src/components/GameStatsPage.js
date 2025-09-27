@@ -653,6 +653,18 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     }
   };
 
+  // Helper function to safely render values (prevents React object rendering errors)
+  const safeRender = (value, fallback = '0') => {
+    if (value === null || value === undefined) {
+      return fallback;
+    }
+    if (typeof value === 'object') {
+      console.warn('⚠️ Attempted to render object directly:', value);
+      return fallback;
+    }
+    return String(value);
+  };
+
   // Function to load comprehensive data for a selected game
   const loadGameData = async (game) => {
     if (!game || !game.id) {
@@ -672,9 +684,11 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.log('📡 Loading comprehensive game data...');
       
       // Load multiple data sources in parallel
-      const [gameSummary, gameDetails, teamStats] = await Promise.all([
+      const [gameSummary, gameBoxscore, gameDetails, teamStats] = await Promise.all([
         // Get game summary with player stats
         footballApi.getGameSummary(game.id, game.league),
+        // Get comprehensive game boxscore with all player statistics
+        footballApi.getGameBoxscore(game.id, game.league),
         // Get detailed game data from ESPN Core API
         footballApi.getGameDetails(game.id, game.league),
         // Get team season stats
@@ -682,17 +696,36 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       ]);
       
       console.log('📊 Game summary:', gameSummary);
+      console.log('📋 Game boxscore:', gameBoxscore);
       console.log('🎮 Game details:', gameDetails);
       console.log('🏈 Team season stats:', teamStats);
       
-      // Combine all data sources
+      // Debug: Check for $ref objects in the data
+      const checkForRefObjects = (obj, path = '') => {
+        if (obj && typeof obj === 'object') {
+          if (obj.$ref) {
+            console.warn(`⚠️ Found $ref object at ${path}:`, obj);
+          }
+          Object.keys(obj).forEach(key => {
+            checkForRefObjects(obj[key], `${path}.${key}`);
+          });
+        }
+      };
+      
+      checkForRefObjects(gameSummary, 'gameSummary');
+      checkForRefObjects(gameBoxscore, 'gameBoxscore');
+      checkForRefObjects(gameDetails, 'gameDetails');
+      checkForRefObjects(teamStats, 'teamStats');
+      
+      // Combine all data sources - prioritize boxscore for player data
       const combinedStats = {
         gameId: game.id,
         gameInfo: game,
         gameSummary: gameSummary,
+        gameBoxscore: gameBoxscore,
         gameDetails: gameDetails,
         teamStats: teamStats,
-        players: gameSummary?.players || []
+        players: gameBoxscore?.players || gameSummary?.players || []
       };
       
       setApiDetailedStats(combinedStats);
@@ -1621,11 +1654,12 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               <button
                                 onClick={() => {
                                   console.log('🧪 Manual API test triggered');
+                                  console.log('Selected game for testing:', selectedGame);
                                   loadGameData(selectedGame);
                                 }}
                                 className="ml-3 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                               >
-                                Test API
+                                Debug API
                               </button>
                             </h2>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
@@ -1674,6 +1708,26 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </div>
                 )}
 
+                {/* Debug Section */}
+                {apiDetailedStats && (
+                  <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg mb-4">
+                    <h4 className="font-bold mb-2">Debug: API Data Structure</h4>
+                    <div className="text-xs space-y-1">
+                      <div>Game Summary: {apiDetailedStats.gameSummary ? '✅' : '❌'}</div>
+                      <div>Game Boxscore: {apiDetailedStats.gameBoxscore ? '✅' : '❌'}</div>
+                      <div>Game Details: {apiDetailedStats.gameDetails ? '✅' : '❌'}</div>
+                      <div>Team Stats: {apiDetailedStats.teamStats ? '✅' : '❌'}</div>
+                      <div>Players: {apiDetailedStats.players?.length || 0}</div>
+                    </div>
+                    <button
+                      onClick={() => console.log('Full API Data:', apiDetailedStats)}
+                      className="text-blue-500 text-xs mt-2"
+                    >
+                      Log Full Data to Console
+                    </button>
+                  </div>
+                )}
+
                 {/* Game Statistics Section */}
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
@@ -1709,7 +1763,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                           {selectedGame.awayTeam}
                         </h3>
                         <div className="text-xl font-bold text-primary-600">
-                          {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameSummary?.awayTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[0]?.score || selectedGame.awayScore || '0')}
+                          {safeRender((selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameBoxscore?.teamStats?.[selectedGame.awayTeam]?.score || detailedStats?.gameSummary?.awayTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[0]?.score || selectedGame.awayScore || '0'))}
                         </div>
                       </div>
                       
@@ -1717,19 +1771,19 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Total Yards</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.totalYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.0.stats.0.value') || '0'}
+                            {safeRender((selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.totalYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.0.stats.0.value') || '0')}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Passing</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.passingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.1.stats.0.value') || '0'}
+                            {safeRender((selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.passingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.1.stats.0.value') || '0')}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Rushing</span>
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.rushingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.2.stats.0.value') || '0'}
+                            {safeRender((selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.rushingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.2.stats.0.value') || '0')}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -1766,7 +1820,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                           {selectedGame.homeTeam}
                         </h3>
                         <div className="text-xl font-bold text-primary-600">
-                          {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameSummary?.homeTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[1]?.score || selectedGame.homeScore || '0')}
+                          {safeRender((selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameBoxscore?.teamStats?.[selectedGame.homeTeam]?.score || detailedStats?.gameSummary?.homeTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[1]?.score || selectedGame.homeScore || '0'))}
                         </div>
                       </div>
                       

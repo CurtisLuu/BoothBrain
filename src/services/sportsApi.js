@@ -505,6 +505,68 @@ class SportsApiService {
     }
   }
 
+  // Get comprehensive game boxscore with all player statistics
+  async getGameBoxscore(eventId, league = 'nfl') {
+    try {
+      console.log(`Fetching game boxscore for event ${eventId} from ESPN API...`);
+      
+      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const boxscoreUrl = `${this.espnBaseUrl}/${sport}/boxscore?event=${eventId}`;
+      console.log('Game boxscore URL:', boxscoreUrl);
+      
+      const response = await fetch(boxscoreUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Game Boxscore API response:', data);
+      
+      return this.formatGameBoxscore(data, league);
+    } catch (error) {
+      console.error('Error fetching game boxscore from ESPN:', error);
+      return null;
+    }
+  }
+
+  // Get play-by-play data for more detailed game information
+  async getGamePlayByPlay(eventId, league = 'nfl') {
+    try {
+      console.log(`Fetching play-by-play for event ${eventId} from ESPN API...`);
+      
+      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const playByPlayUrl = `${this.espnBaseUrl}/${sport}/playbyplay?event=${eventId}`;
+      console.log('Play-by-play URL:', playByPlayUrl);
+      
+      const response = await fetch(playByPlayUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Play-by-play API response:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching play-by-play from ESPN:', error);
+      return null;
+    }
+  }
+
   // Get detailed game data using ESPN's core API
   async getGameDetails(gameId, league = 'nfl') {
     try {
@@ -704,6 +766,92 @@ class SportsApiService {
       gameId: gameInfo?.id || data.id,
       gameInfo: gameInfo,
       players: playerStats
+    };
+  }
+
+  // Format game boxscore data with comprehensive player statistics
+  formatGameBoxscore(data, league) {
+    console.log('Raw ESPN Boxscore API response structure:', data);
+    
+    if (!data) {
+      console.log('No boxscore data available from ESPN API');
+      return null;
+    }
+
+    let players = [];
+    let gameInfo = null;
+    let teamStats = {};
+
+    // Extract game info
+    if (data.header) {
+      gameInfo = data.header;
+    }
+
+    // Extract team statistics
+    if (data.boxscore && data.boxscore.teams) {
+      const teams = data.boxscore.teams;
+      teams.forEach(team => {
+        const teamName = team.team?.displayName || 'Unknown Team';
+        teamStats[teamName] = {
+          score: team.score || 0,
+          statistics: team.statistics || []
+        };
+      });
+    }
+
+    // Extract players from boxscore
+    if (data.boxscore && data.boxscore.teams) {
+      const teams = data.boxscore.teams;
+      players = [];
+      
+      teams.forEach(team => {
+        const teamName = team.team?.displayName || 'Unknown Team';
+        
+        // Get all statistics categories for this team
+        if (team.statistics) {
+          team.statistics.forEach(statCategory => {
+            if (statCategory.athletes) {
+              statCategory.athletes.forEach(athlete => {
+                if (athlete.athlete) {
+                  const playerData = athlete.athlete;
+                  const stats = athlete.stats || [];
+                  
+                  // Check if we already have this player
+                  const existingPlayer = players.find(p => p.id === playerData.id);
+                  
+                  if (existingPlayer) {
+                    // Add stats to existing player
+                    existingPlayer.gameStats = {
+                      ...existingPlayer.gameStats,
+                      ...this.formatPlayerStats(stats, league)
+                    };
+                  } else {
+                    // Create new player
+                    players.push({
+                      id: playerData.id || `player-${players.length}`,
+                      name: playerData.displayName || `Player ${players.length + 1}`,
+                      position: playerData.position?.abbreviation || 'N/A',
+                      team: teamName,
+                      jersey: playerData.jersey || 'N/A',
+                      gameStats: this.formatPlayerStats(stats, league),
+                      seasonStats: {} // Will be filled by other API calls
+                    });
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    console.log(`Formatting boxscore with ${players.length} players`);
+
+    return {
+      gameId: gameInfo?.id || data.id,
+      gameInfo: gameInfo,
+      teamStats: teamStats,
+      players: players
     };
   }
 
