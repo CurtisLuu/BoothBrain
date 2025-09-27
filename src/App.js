@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar } from 'lucide-react';
 import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
+import TeamPage from './components/TeamPageEnhanced';
+import SchedulePage from './components/SchedulePage';
 import footballApi from './services/footballApi';
 
 // Main Dashboard Component
-function Dashboard() {
-  const [activeTab, setActiveTab] = useState('nfl');
+function Dashboard({ activeTab, setActiveTab }) {
+  const navigate = useNavigate();
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [activePage, setActivePage] = useState('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load games when component mounts or tab changes
   useEffect(() => {
@@ -112,23 +118,102 @@ function Dashboard() {
 
   const currentWeek = getCurrentWeek(currentGames);
 
+  // Generate search suggestions
+  const generateSuggestions = (query) => {
+    if (!query || query.length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const allGames = [...nflGames, ...ncaaGames];
+    const teamNames = new Set();
+    
+    allGames.forEach(game => {
+      if (game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
+        teamNames.add(game.homeTeam);
+      }
+      if (game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
+        teamNames.add(game.awayTeam);
+      }
+    });
+
+    const suggestions = Array.from(teamNames).slice(0, 5);
+    setSearchSuggestions(suggestions);
+    setShowSuggestions(suggestions.length > 0);
+  };
+
+  // Handle search input change
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    generateSuggestions(value);
+  };
+
+  // Find team league from games data
+  const findTeamLeague = (teamName) => {
+    const allGames = [...nflGames, ...ncaaGames];
+    const game = allGames.find(game => 
+      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
+      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
+    );
+    return game ? game.league : 'nfl'; // Default to NFL if not found
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (teamName) => {
+    setSearchQuery(teamName);
+    setShowSuggestions(false);
+    const league = findTeamLeague(teamName);
+    navigate('/team', { state: { team: { name: teamName, league } } });
+  };
+
+  // Handle search form submit (Enter key)
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setShowSuggestions(false);
+      const league = findTeamLeague(searchQuery.trim());
+      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
+    }
+  };
+
+  // Navigation functions
+  const navigateToStats = () => {
+    setActivePage('stats');
+    navigate('/stats');
+  };
+
+  const navigateToSchedule = () => {
+    setActivePage('schedule');
+    navigate('/schedule');
+  };
+
+  const navigateToHome = () => {
+    setActivePage('home');
+    // Clear the saved game when navigating to home page
+    localStorage.removeItem('selectedGame');
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center w-10 h-10 bg-primary-600 rounded-lg">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-black dark:text-white">Football AI</h1>
-                <p className="text-sm text-gray-700 dark:text-gray-300">Powered by AI Analytics</p>
-              </div>
-            </div>
-
             <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-primary-600 rounded-lg">
+                  <Trophy className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-black dark:text-white">Football AI</h1>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">Powered by AI Analytics</p>
+                </div>
+              </div>
+
+              {/* League Tabs - Only on Home Page */}
               <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setActiveTab('nfl')}
@@ -143,7 +228,91 @@ function Dashboard() {
                   NCAA
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* Navigation Tabs */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={navigateToHome}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'home' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Home className="w-4 h-4" />
+                  <span>Home</span>
+                </button>
+                <button
+                  onClick={navigateToStats}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'stats' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Stats</span>
+                </button>
+                <button
+                  onClick={navigateToSchedule}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'schedule' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Schedule</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <form onSubmit={handleSearch} className="flex items-center space-x-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search team..."
+                      value={searchQuery}
+                      onChange={handleSearchInputChange}
+                      onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                      className="pl-10 pr-4 py-2 w-48 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  >
+                    Search
+                  </button>
+                </form>
+
+                {/* Search Suggestions Dropdown */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                    <div className="py-1">
+                      {searchSuggestions.map((team, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSuggestionClick(team)}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Search className="w-4 h-4 text-gray-400" />
+                            <span>{team}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               
+              {/* Dark Mode Toggle */}
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -315,11 +484,15 @@ function Dashboard() {
 
 // Main App Component with Router
 function App() {
+  const [activeTab, setActiveTab] = useState('nfl');
+  
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/stats" element={<GameStatsPage />} />
+        <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
+        <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} />} />
+        <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} />} />
+        <Route path="/team" element={<TeamPage />} />
       </Routes>
     </Router>
   );
