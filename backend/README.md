@@ -1,114 +1,316 @@
-# PDF Editor Backend
+# 🐍 Backend - Football AI
 
-A Python FastAPI backend for PDF processing and editing using PyMuPDF (fitz).
+Python backend services for PDF processing and sports analytics API.
 
-## Features
+## 🚀 Quick Start
 
-- **PDF Upload**: Upload and process PDF files
-- **Page Rendering**: Convert PDF pages to high-quality images
-- **Annotation Support**: Add text, shapes, drawings to PDFs
-- **Real PDF Editing**: Modify actual PDF content (not just overlays)
-- **Export**: Download edited PDFs with annotations
-
-## Setup
-
-### 1. Install Python Dependencies
-
+### **Option 1: PyMuPDF Backend (Port 8000)**
 ```bash
-cd backend
+# Install dependencies
 pip install -r requirements.txt
+
+# Start server
+python main.py
 ```
 
-### 2. Start the Backend Server
-
+### **Option 2: pdf2image Backend (Port 8001)**
 ```bash
-python start.py
+# Install dependencies
+pip install -r requirements_alt.txt
+
+# Start server
+python start_alt.py
 ```
 
-Or on Windows:
+### **Windows Quick Start**
 ```bash
+# Run batch file
 start_backend.bat
 ```
 
-The server will be available at:
-- **API**: http://localhost:8000
-- **Documentation**: http://localhost:8000/docs
-- **Interactive API**: http://localhost:8000/redoc
-
-## API Endpoints
-
-### Upload PDF
-```
-POST /upload-pdf
-Content-Type: multipart/form-data
-Body: file (PDF file)
-```
-
-### Get PDF Info
-```
-GET /pdf-info/{file_id}
-```
-
-### Get PDF Page
-```
-GET /pdf-page/{file_id}/{page_num}
-```
-
-### Add Annotations
-```
-POST /add-annotations
-Content-Type: application/json
-Body: {
-  "file_id": "string",
-  "annotations": [...],
-  "page": 0
-}
-```
-
-### Export PDF
-```
-POST /export-pdf
-Content-Type: application/json
-Body: {
-  "file_id": "string",
-  "annotations": [...],
-  "page": 0
-}
-```
-
-### Download PDF
-```
-GET /download-pdf/{file_id}
-```
-
-## Technology Stack
-
-- **FastAPI**: Modern Python web framework
-- **PyMuPDF (fitz)**: PDF processing and manipulation
-- **Pillow**: Image processing
-- **Uvicorn**: ASGI server
-
-## File Structure
+## 📁 Project Structure
 
 ```
 backend/
-├── main.py              # FastAPI application
-├── start.py             # Startup script
-├── requirements.txt     # Python dependencies
-├── uploads/            # Uploaded PDF files
-├── processed/          # Processed/edited PDFs
-└── static/             # Static files
+├── main.py              # PyMuPDF backend (Port 8000)
+├── main_alt.py          # pdf2image backend (Port 8001)
+├── start.py             # PyMuPDF startup script
+├── start_alt.py         # pdf2image startup script
+├── requirements.txt     # PyMuPDF dependencies
+├── requirements_alt.txt # pdf2image dependencies
+├── uploads/             # PDF file storage
+├── processed/           # Processed files
+├── static/              # Static assets
+├── start_backend.bat    # Windows startup script
+└── README.md           # This file
 ```
 
-## Development
+## 🛠️ Installation
 
-The backend runs with auto-reload enabled, so changes to the code will automatically restart the server.
+### **Prerequisites**
+- Python 3.8 or higher
+- pip package manager
 
-## Production Deployment
+### **PyMuPDF Backend**
+```bash
+pip install -r requirements.txt
+```
 
-For production, consider:
-- Using a production ASGI server like Gunicorn
-- Setting up proper file storage (S3, etc.)
-- Adding authentication and authorization
-- Implementing rate limiting
-- Adding logging and monitoring
+**Dependencies:**
+- `fastapi==0.104.1` - Web framework
+- `uvicorn==0.24.0` - ASGI server
+- `PyMuPDF==1.23.8` - PDF processing
+- `Pillow==10.1.0` - Image processing
+- `python-multipart==0.0.6` - File upload support
+
+### **pdf2image Backend**
+```bash
+pip install -r requirements_alt.txt
+```
+
+**Additional Dependencies:**
+- `pdf2image==1.16.3` - PDF to image conversion
+
+### **System Dependencies (pdf2image)**
+For pdf2image to work, you need poppler-utils:
+
+**Windows:**
+```bash
+# Install via conda
+conda install -c conda-forge poppler
+
+# Or download from: https://github.com/oschwartz10612/poppler-windows
+```
+
+**macOS:**
+```bash
+brew install poppler
+```
+
+**Linux:**
+```bash
+sudo apt-get install poppler-utils
+```
+
+## 🔧 API Endpoints
+
+### **Core Endpoints**
+- `GET /` - Health check
+- `GET /debug/files` - List loaded files
+- `POST /upload-pdf` - Upload PDF file
+- `GET /pdf-page/{file_id}/{page_num}` - Get PDF page as image
+- `POST /add-annotations` - Save annotations
+- `GET /get-annotations/{file_id}` - Retrieve annotations
+- `GET /export-pdf/{file_id}` - Export modified PDF
+
+### **Request/Response Examples**
+
+#### **Upload PDF**
+```bash
+curl -X POST "http://localhost:8000/upload-pdf" \
+  -F "file=@document.pdf"
+```
+
+**Response:**
+```json
+{
+  "file_id": "uuid-string",
+  "total_pages": 4,
+  "width": 595.0,
+  "height": 842.0
+}
+```
+
+#### **Get PDF Page**
+```bash
+curl "http://localhost:8000/pdf-page/{file_id}/0"
+```
+
+**Response:**
+```json
+{
+  "page_image": "base64-encoded-image",
+  "page_size": {
+    "width": 595.0,
+    "height": 842.0
+  }
+}
+```
+
+## 🔄 PDF Processing Technologies
+
+### **PyMuPDF Backend (main.py)**
+- **Technology**: PyMuPDF (fitz)
+- **Pros**: Fast, feature-rich
+- **Cons**: May have compatibility issues with some PDFs
+- **Port**: 8000
+
+### **pdf2image Backend (main_alt.py)**
+- **Technology**: pdf2image + Pillow
+- **Pros**: More reliable, better compatibility
+- **Cons**: Slower processing
+- **Port**: 8001
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+
+#### **"Orphaned Object" Error (PyMuPDF)**
+- **Cause**: PDF compatibility issue
+- **Solution**: Use pdf2image backend or PDF.js frontend editor
+
+#### **Port Already in Use**
+- **Solution**: Kill existing process or use different port
+```bash
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# Linux/macOS
+lsof -ti:8000 | xargs kill -9
+```
+
+#### **PDF Upload Fails**
+- **Check**: File size limits and format
+- **Solution**: Ensure PDF is valid and not corrupted
+
+#### **Image Rendering Issues**
+- **PyMuPDF**: Try different rendering methods
+- **pdf2image**: Check poppler installation
+
+### **Debug Mode**
+Enable debug logging by setting environment variable:
+```bash
+export DEBUG=true
+python main.py
+```
+
+## 🔧 Configuration
+
+### **Environment Variables**
+Create `.env` file:
+```env
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=10485760  # 10MB
+ALLOWED_ORIGINS=http://localhost:3000
+```
+
+### **File Storage**
+- **Upload Directory**: `uploads/`
+- **File Naming**: `{file_id}_{original_name}.pdf`
+- **Cleanup**: Manual cleanup required (auto-cleanup not implemented)
+
+## 📊 Performance
+
+### **Optimization Tips**
+- Use appropriate image quality settings
+- Implement file cleanup routines
+- Add caching for frequently accessed files
+- Monitor memory usage with large PDFs
+
+### **Monitoring**
+- Check server logs for errors
+- Monitor disk space in uploads directory
+- Track API response times
+
+## 🔒 Security
+
+### **Current Implementation**
+- CORS enabled for frontend
+- File type validation
+- Basic error handling
+
+### **Production Considerations**
+- Add authentication/authorization
+- Implement rate limiting
+- Add input validation
+- Use HTTPS
+- Implement file size limits
+
+## 🧪 Testing
+
+### **Manual Testing**
+```bash
+# Test health endpoint
+curl http://localhost:8000/
+
+# Test file upload
+curl -X POST "http://localhost:8000/upload-pdf" -F "file=@test.pdf"
+
+# Test page rendering
+curl "http://localhost:8000/pdf-page/{file_id}/0"
+```
+
+### **Automated Testing**
+```bash
+# Install test dependencies
+pip install pytest httpx
+
+# Run tests
+pytest tests/
+```
+
+## 📦 Deployment
+
+### **Production Setup**
+1. **Use production WSGI server**:
+   ```bash
+   pip install gunicorn
+   gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+   ```
+
+2. **Set up reverse proxy** (nginx):
+   ```nginx
+   location / {
+       proxy_pass http://localhost:8000;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+   }
+   ```
+
+3. **Use environment variables** for configuration
+
+### **Docker Deployment**
+```dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+
+CMD ["python", "main.py"]
+```
+
+## 🔄 Development
+
+### **Adding New Endpoints**
+1. Add route in `main.py` or `main_alt.py`
+2. Define request/response models
+3. Add error handling
+4. Update documentation
+
+### **PDF Processing Improvements**
+- Add support for more PDF features
+- Implement annotation persistence
+- Add PDF modification capabilities
+- Optimize rendering performance
+
+## 📝 Logging
+
+### **Log Levels**
+- **INFO**: General information
+- **ERROR**: Error conditions
+- **DEBUG**: Detailed debugging information
+
+### **Log Format**
+```
+INFO:     127.0.0.1:52254 - "GET / HTTP/1.1" 200 OK
+ERROR:    Error rendering page: orphaned object: parent is None
+```
+
+---
+
+**Backend built with Python and FastAPI** 🐍
