@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Filter, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
+import { useDarkMode } from '../contexts/DarkModeContext';
 
 const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [activePage, setActivePage] = useState('schedule');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -16,14 +17,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [availableTeams, setAvailableTeams] = useState([]);
 
-  // Apply dark mode class to document
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
 
   // Load initial games
   useEffect(() => {
@@ -340,20 +333,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                   <p className="text-sm text-gray-700 dark:text-gray-300">Upcoming and past games</p>
                 </div>
               </div>
-
-
-              {/* Dark Mode Toggle */}
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                aria-label="Toggle dark mode"
-              >
-                {isDarkMode ? (
-                  <Sun className="w-4 h-4 text-yellow-500" />
-                ) : (
-                  <Moon className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                )}
-              </button>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -437,6 +416,19 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                   </div>
                 )}
               </div>
+              
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                aria-label="Toggle dark mode"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-4 h-4 text-yellow-500" />
+                ) : (
+                  <Moon className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                )}
+              </button>
             </div>
           </div>
         </div>

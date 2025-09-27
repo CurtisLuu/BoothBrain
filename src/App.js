@@ -6,15 +6,16 @@ import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
 import footballApi from './services/footballApi';
+import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
 
 // Main Dashboard Component
 function Dashboard({ activeTab, setActiveTab }) {
   const navigate = useNavigate();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activePage, setActivePage] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -25,14 +26,6 @@ function Dashboard({ activeTab, setActiveTab }) {
     loadGames();
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply dark mode class to document
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
@@ -89,7 +82,9 @@ function Dashboard({ activeTab, setActiveTab }) {
         date,
         games: grouped[date].sort((a, b) => {
           // Sort games within each date by time
-          return a.time.localeCompare(b.time);
+          const timeA = a.time || '';
+          const timeB = b.time || '';
+          return timeA.localeCompare(timeB);
         })
       }));
   };
@@ -130,10 +125,10 @@ function Dashboard({ activeTab, setActiveTab }) {
     const teamNames = new Set();
     
     allGames.forEach(game => {
-      if (game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
+      if (game.homeTeam && game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
         teamNames.add(game.homeTeam);
       }
-      if (game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
+      if (game.awayTeam && game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
         teamNames.add(game.awayTeam);
       }
     });
@@ -154,8 +149,8 @@ function Dashboard({ activeTab, setActiveTab }) {
   const findTeamLeague = (teamName) => {
     const allGames = [...nflGames, ...ncaaGames];
     const game = allGames.find(game => 
-      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
+      (game.homeTeam && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())) ||
+      (game.awayTeam && game.awayTeam.toLowerCase().includes(teamName.toLowerCase()))
     );
     return game ? game.league : 'nfl'; // Default to NFL if not found
   };
@@ -314,7 +309,7 @@ function Dashboard({ activeTab, setActiveTab }) {
               
               {/* Dark Mode Toggle */}
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={toggleDarkMode}
                 className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 aria-label="Toggle dark mode"
               >
@@ -487,14 +482,16 @@ function App() {
   const [activeTab, setActiveTab] = useState('nfl');
   
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
-        <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-        <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-        <Route path="/team" element={<TeamPage />} />
-      </Routes>
-    </Router>
+    <DarkModeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
+          <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+          <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+          <Route path="/team" element={<TeamPage />} />
+        </Routes>
+      </Router>
+    </DarkModeProvider>
   );
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
+import { useDarkMode } from '../contexts/DarkModeContext';
 
 // All Statistics Section Component
 const AllStatisticsSection = ({ selectedGame, teamStats }) => {
@@ -388,6 +389,7 @@ const PlayerCard = ({ player }) => {
 const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [selectedGame, setSelectedGame] = useState(null);
   const [allGames, setAllGames] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -395,7 +397,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const [apiDetailedStats, setApiDetailedStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activePage, setActivePage] = useState('stats');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -437,14 +438,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     }
   }, [gameFromState, sidebarCollapsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply dark mode class to document
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
 
 
   const loadAllGames = async () => {
@@ -1126,7 +1119,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
               
               {/* Dark Mode Toggle */}
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={toggleDarkMode}
                 className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 aria-label="Toggle dark mode"
               >
@@ -1735,23 +1728,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                     Game Statistics
                   </h2>
                   
-                  {/* Show warning for scheduled games */}
-                  {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                            This game is scheduled and hasn't started yet. Game statistics will be available once the game begins.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   
                   {/* Compact Game Stats */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
