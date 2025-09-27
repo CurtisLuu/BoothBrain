@@ -45,6 +45,7 @@ class FootballApiService {
         awayScore: 17,
         status: 'Final',
         time: '4:25 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       },
@@ -56,6 +57,7 @@ class FootballApiService {
         awayScore: 23,
         status: 'Final',
         time: '8:20 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       },
@@ -67,6 +69,7 @@ class FootballApiService {
         awayScore: 21,
         status: 'Final',
         time: '1:00 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       }
@@ -83,6 +86,7 @@ class FootballApiService {
         awayScore: 24,
         status: 'Final',
         time: '3:30 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       },
@@ -94,6 +98,7 @@ class FootballApiService {
         awayScore: 27,
         status: 'Final',
         time: '12:00 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       },
@@ -105,6 +110,7 @@ class FootballApiService {
         awayScore: 28,
         status: 'Final',
         time: '7:30 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       }

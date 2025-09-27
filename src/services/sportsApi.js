@@ -79,6 +79,7 @@ class SportsApiService {
         awayScore: parseInt(awayTeam?.score) || 0,
         status: this.getGameStatus(competition.status?.type?.name),
         time: this.formatGameTime(event.date),
+        date: this.formatGameDate(event.date),
         week: this.getWeekNumber(event.date, league),
         league: league
       };
@@ -109,6 +110,18 @@ class SportsApiService {
     });
   }
 
+  // Format game date
+  formatGameDate(dateString) {
+    if (!dateString) return 'TBD';
+    
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
   // Get week number
   getWeekNumber(dateString, league) {
     if (!dateString) return 'Week 1';
@@ -130,6 +143,7 @@ class SportsApiService {
         awayScore: 17,
         status: 'Final',
         time: '4:25 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       },
@@ -141,6 +155,7 @@ class SportsApiService {
         awayScore: 23,
         status: 'Final',
         time: '8:20 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       },
@@ -152,6 +167,7 @@ class SportsApiService {
         awayScore: 21,
         status: 'Final',
         time: '1:00 PM ET',
+        date: 'Sun, Oct 15',
         week: 'Week 6',
         league: 'nfl'
       }
@@ -168,6 +184,7 @@ class SportsApiService {
         awayScore: 24,
         status: 'Final',
         time: '3:30 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       },
@@ -179,6 +196,7 @@ class SportsApiService {
         awayScore: 27,
         status: 'Final',
         time: '12:00 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       },
@@ -190,6 +208,7 @@ class SportsApiService {
         awayScore: 28,
         status: 'Final',
         time: '7:30 PM ET',
+        date: 'Sat, Oct 14',
         week: 'Week 7',
         league: 'ncaa'
       }
