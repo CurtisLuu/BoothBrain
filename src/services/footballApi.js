@@ -1,33 +1,16 @@
-// Football API service using RapidAPI
-const RAPIDAPI_KEY = process.env.REACT_APP_RAPIDAPI_KEY || 'your-rapidapi-key-here';
-const RAPIDAPI_HOST = 'free-api-live-football-data.p.rapidapi.com';
+// Football API service using real sports APIs
+import sportsApiService from './sportsApi';
 
 class FootballApiService {
-  constructor() {
-    this.baseUrl = 'https://free-api-live-football-data.p.rapidapi.com';
-    this.headers = {
-      'X-RapidAPI-Key': RAPIDAPI_KEY,
-      'X-RapidAPI-Host': RAPIDAPI_HOST,
-    };
-  }
+  // No constructor needed - using static methods
 
-  // Get NFL games for a specific date
+  // Get NFL games using real ESPN API
   async getNFLGames(date = null) {
     try {
-      const dateParam = date || new Date().toISOString().split('T')[0];
-      const url = `${this.baseUrl}/games?date=${dateParam}&league=1`; // League 1 is NFL
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return this.formatNFLGames(data);
+      console.log('Fetching NFL games from ESPN API...');
+      const games = await sportsApiService.getNFLGames();
+      console.log('NFL games fetched:', games);
+      return games;
     } catch (error) {
       console.error('Error fetching NFL games:', error);
       // Return mock data as fallback
@@ -35,23 +18,13 @@ class FootballApiService {
     }
   }
 
-  // Get NCAA games for a specific date
+  // Get NCAA games using real ESPN API
   async getNCAAGames(date = null) {
     try {
-      const dateParam = date || new Date().toISOString().split('T')[0];
-      const url = `${this.baseUrl}/games?date=${dateParam}&league=2`; // League 2 is NCAA
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return this.formatNCAAGames(data);
+      console.log('Fetching NCAA games from ESPN API...');
+      const games = await sportsApiService.getNCAAGames();
+      console.log('NCAA games fetched:', games);
+      return games;
     } catch (error) {
       console.error('Error fetching NCAA games:', error);
       // Return mock data as fallback
@@ -59,81 +32,7 @@ class FootballApiService {
     }
   }
 
-  // Format NFL games data
-  formatNFLGames(data) {
-    if (!data || !data.games) {
-      return this.getMockNFLGames();
-    }
-
-    return data.games.map((game, index) => ({
-      id: game.id || index + 1,
-      homeTeam: game.home_team?.name || 'Home Team',
-      awayTeam: game.away_team?.name || 'Away Team',
-      homeScore: game.home_score || 0,
-      awayScore: game.away_score || 0,
-      status: this.getGameStatus(game.status),
-      time: this.formatGameTime(game.date),
-      week: this.getWeekNumber(game.date),
-      homeTeamLogo: game.home_team?.logo,
-      awayTeamLogo: game.away_team?.logo,
-      league: 'nfl'
-    }));
-  }
-
-  // Format NCAA games data
-  formatNCAAGames(data) {
-    if (!data || !data.games) {
-      return this.getMockNCAAGames();
-    }
-
-    return data.games.map((game, index) => ({
-      id: game.id || index + 1,
-      homeTeam: game.home_team?.name || 'Home Team',
-      awayTeam: game.away_team?.name || 'Away Team',
-      homeScore: game.home_score || 0,
-      awayScore: game.away_score || 0,
-      status: this.getGameStatus(game.status),
-      time: this.formatGameTime(game.date),
-      week: this.getWeekNumber(game.date),
-      homeTeamLogo: game.home_team?.logo,
-      awayTeamLogo: game.away_team?.logo,
-      league: 'ncaa'
-    }));
-  }
-
-  // Get game status
-  getGameStatus(status) {
-    const statusMap = {
-      'finished': 'Final',
-      'in_progress': 'Live',
-      'scheduled': 'Scheduled',
-      'postponed': 'Postponed',
-      'cancelled': 'Cancelled'
-    };
-    return statusMap[status] || 'Unknown';
-  }
-
-  // Format game time
-  formatGameTime(dateString) {
-    if (!dateString) return 'TBD';
-    
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    });
-  }
-
-  // Get week number (simplified)
-  getWeekNumber(dateString) {
-    if (!dateString) return 'Week 1';
-    
-    const date = new Date(dateString);
-    const seasonStart = new Date(date.getFullYear(), 8, 1); // September 1st
-    const weekNumber = Math.ceil((date - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-    return `Week ${Math.max(1, weekNumber)}`;
-  }
+  // Helper methods for data formatting (kept for compatibility)
 
   // Mock data fallbacks
   getMockNFLGames() {

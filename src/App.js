@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, BarChart3, Star, RefreshCw } from 'lucide-react';
+import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun } from 'lucide-react';
 import GameCard from './components/GameCard';
 import footballApi from './services/footballApi';
 
@@ -9,11 +9,21 @@ function App() {
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Load games when component mounts or tab changes
   useEffect(() => {
     loadGames();
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
@@ -48,9 +58,9 @@ function App() {
   const currentGames = activeTab === 'nfl' ? nflGames : ncaaGames;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
@@ -58,13 +68,13 @@ function App() {
                 <Trophy className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-black">Football AI</h1>
-                <p className="text-sm text-gray-700">Powered by AI Analytics</p>
+                <h1 className="text-xl font-bold text-black dark:text-white">Football AI</h1>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Powered by AI Analytics</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
-              <div className="flex bg-gray-100 rounded-lg p-1">
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setActiveTab('nfl')}
                   className={`tab-button ${activeTab === 'nfl' ? 'active' : 'inactive'}`}
@@ -78,6 +88,18 @@ function App() {
                   NCAA
                 </button>
               </div>
+              
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="px-3 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                aria-label="Toggle dark mode"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-4 h-4 text-yellow-500" />
+                ) : (
+                  <Moon className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -119,15 +141,15 @@ function App() {
       </section>
 
       {/* Games Section */}
-      <section className="py-12">
+      <section className="py-12 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-bold text-black">
-              {activeTab === 'nfl' ? 'NFL Games' : 'NCAA Games'} ({currentGames.length})
+            <h3 className="text-2xl font-bold text-black dark:text-white">
+              {activeTab === 'nfl' ? 'Recent NFL Games' : ' Recent NCAA Games'} 
             </h3>
             <div className="flex items-center space-x-4">
               {lastUpdated && (
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   Last updated: {lastUpdated.toLocaleTimeString()}
                 </div>
               )}
@@ -146,14 +168,14 @@ function App() {
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center space-x-3">
                 <RefreshCw className="w-6 h-6 animate-spin text-primary-600" />
-                <span className="text-lg text-gray-600">Loading games...</span>
+                <span className="text-lg text-gray-600 dark:text-gray-300">Loading games...</span>
               </div>
             </div>
           ) : currentGames.length === 0 ? (
             <div className="text-center py-12">
-              <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h4 className="text-xl font-semibold text-gray-600 mb-2">No Games Available</h4>
-              <p className="text-gray-500 mb-4">
+              <Trophy className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <h4 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No Games Available</h4>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
                 No {activeTab.toUpperCase()} games found for today. Try refreshing or check back later.
               </p>
               <button
@@ -174,13 +196,13 @@ function App() {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-white dark:bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-black mb-4">
+            <h3 className="text-3xl font-bold text-black dark:text-white mb-4">
               Why Choose Football AI?
             </h3>
-            <p className="text-lg text-gray-700 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">
               Experience football like never before with our AI-powered platform
             </p>
           </div>
@@ -190,30 +212,30 @@ function App() {
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <BarChart3 className="w-8 h-8 text-primary-600" />
               </div>
-              <h4 className="text-xl font-semibold text-black mb-2">Real-time Analytics</h4>
-              <p className="text-gray-700">
-                Get instant access to advanced statistics, player performance metrics, and game insights.
-              </p>
+                    <h4 className="text-xl font-semibold text-black dark:text-white mb-2">Real-time Analytics</h4>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Get instant access to advanced statistics, player performance metrics, and game insights.
+                    </p>
             </div>
 
             <div className="text-center">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Star className="w-8 h-8 text-primary-600" />
               </div>
-              <h4 className="text-xl font-semibold text-black mb-2">Advanced Analytics</h4>
-              <p className="text-gray-700">
-                Deep dive into player performance, team statistics, and historical data with our comprehensive analytics.
-              </p>
+                    <h4 className="text-xl font-semibold text-black dark:text-white mb-2">Advanced Analytics</h4>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Deep dive into player performance, team statistics, and historical data with our comprehensive analytics.
+                    </p>
             </div>
 
             <div className="text-center">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trophy className="w-8 h-8 text-primary-600" />
               </div>
-              <h4 className="text-xl font-semibold text-black mb-2">Comprehensive Coverage</h4>
-              <p className="text-gray-700">
-                Follow both NFL and NCAA games with detailed analysis and historical context.
-              </p>
+                    <h4 className="text-xl font-semibold text-black dark:text-white mb-2">Comprehensive Coverage</h4>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Follow both NFL and NCAA games with detailed analysis and historical context.
+                    </p>
             </div>
           </div>
         </div>
