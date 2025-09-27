@@ -283,6 +283,32 @@ class FootballApiService {
       return [];
     }
   }
+
+  // Get team information by name
+  async getTeamByName(teamName, league = 'nfl') {
+    try {
+      console.log(`Finding team: ${teamName}...`);
+      const team = await sportsApiService.getTeamByName(teamName, league);
+      console.log(`Team found:`, team);
+      return team;
+    } catch (error) {
+      console.error(`Error finding team ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Get team roster by team ID
+  async getTeamRoster(teamId, league = 'nfl') {
+    try {
+      console.log(`Fetching roster for team ID: ${teamId}...`);
+      const roster = await sportsApiService.getTeamRoster(teamId, league);
+      console.log(`Team roster fetched: ${roster.length} players`);
+      return roster;
+    } catch (error) {
+      console.error(`Error fetching roster for team ${teamId}:`, error);
+      return [];
+    }
+  }
 }
 
 const footballApiService = new FootballApiService();

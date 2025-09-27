@@ -479,6 +479,7 @@ class SportsApiService {
     try {
       console.log(`Fetching game summary for event ${eventId} from ESPN API...`);
       
+      // Use the correct ESPN API endpoint structure (same as working scoreboard endpoints)
       const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
       const summaryUrl = `${this.espnBaseUrl}/${sport}/summary?event=${eventId}`;
       console.log('Game summary URL:', summaryUrl);
@@ -510,6 +511,7 @@ class SportsApiService {
     try {
       console.log(`Fetching game boxscore for event ${eventId} from ESPN API...`);
       
+      // Use the correct ESPN API endpoint structure (same as working scoreboard endpoints)
       const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
       const boxscoreUrl = `${this.espnBaseUrl}/${sport}/boxscore?event=${eventId}`;
       console.log('Game boxscore URL:', boxscoreUrl);
@@ -1044,6 +1046,192 @@ class SportsApiService {
         league: 'ncaa'
       }
     ];
+  }
+
+  // Get team information by name
+  async getTeamByName(teamName, league = 'nfl') {
+    try {
+      console.log(`🔍 Finding team: ${teamName} from ESPN API...`);
+      const teamsUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/teams?pageSize=32`; // Fetch all 32 teams
+      console.log('Teams URL:', teamsUrl);
+      
+      const response = await fetch(teamsUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Teams API response:', data);
+      console.log(`Total teams available: ${data.count}, Retrieved: ${data.items?.length || 0}`);
+      console.log('First few teams:', data.items?.slice(0, 5).map(t => ({ name: t.displayName, id: t.id })));
+      
+      // Find the team by name with multiple matching strategies
+      const team = data.items?.find(t => {
+        const displayName = t.displayName?.toLowerCase() || '';
+        const abbreviation = t.abbreviation?.toLowerCase() || '';
+        const searchName = teamName.toLowerCase();
+        
+        const matches = displayName.includes(searchName) ||
+               searchName.includes(displayName) ||
+               abbreviation === searchName ||
+               displayName === searchName;
+        
+        if (matches) {
+          console.log(`✅ Team match found: "${t.displayName}" for search "${teamName}"`);
+        }
+        
+        return matches;
+      });
+
+      if (team) {
+        console.log(`✅ Found team: ${team.displayName} (ID: ${team.id})`);
+        return {
+          id: team.id,
+          name: team.displayName,
+          abbreviation: team.abbreviation,
+          city: team.location,
+          conference: team.conference?.name,
+          division: team.division?.name
+        };
+      }
+
+      // Fallback to fetch all pages if not found in first page (though pageSize=32 should cover all NFL teams)
+      if (data.pageCount > 1) {
+        console.log(`🔄 Team not found in first page, fetching all ${data.pageCount} pages...`);
+        return await this.getAllTeamsAndFind(teamName);
+      }
+
+      console.log(`❌ Team not found: ${teamName}`);
+      console.log('Available teams:', data.items?.map(t => t.displayName));
+      return null;
+    } catch (error) {
+      console.error(`Error finding team ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Get all teams and find specific team (fallback for pagination)
+  async getAllTeamsAndFind(teamName) {
+    try {
+      console.log(`🔍 Fetching all teams to find: ${teamName}...`);
+      const allTeams = [];
+      let pageIndex = 1;
+      let hasMorePages = true;
+      
+      while (hasMorePages) {
+        const teamsUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/teams?pageIndex=${pageIndex}&pageSize=25`;
+        console.log(`Fetching page ${pageIndex}:`, teamsUrl);
+        
+        const response = await fetch(teamsUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`ESPN API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        allTeams.push(...data.items);
+        console.log(`Page ${pageIndex}: Found ${data.items.length} teams, Total so far: ${allTeams.length}`);
+        hasMorePages = pageIndex < data.pageCount;
+        pageIndex++;
+      }
+      
+      console.log(`✅ Fetched all ${allTeams.length} teams across ${pageIndex - 1} pages`);
+      
+      const team = allTeams.find(t => {
+        const displayName = t.displayName?.toLowerCase() || '';
+        const abbreviation = t.abbreviation?.toLowerCase() || '';
+        const searchName = teamName.toLowerCase();
+        return displayName.includes(searchName) || searchName.includes(displayName) || abbreviation === searchName || displayName === searchName;
+      });
+
+      if (team) {
+        console.log(`✅ Found team: ${team.displayName} (ID: ${team.id})`);
+        return {
+          id: team.id,
+          name: team.displayName,
+          abbreviation: team.abbreviation,
+          city: team.location,
+          conference: team.conference?.name,
+          division: team.division?.name
+        };
+      }
+      
+      console.log(`❌ Team not found: ${teamName}`);
+      console.log('All available teams:', allTeams.map(t => t.displayName));
+      return null;
+    } catch (error) {
+      console.error(`Error fetching all teams for ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Get team roster by team ID
+  async getTeamRoster(teamId, league = 'nfl') {
+    try {
+      console.log(`🔍 Fetching roster for team ID: ${teamId} from ESPN API...`);
+      const rosterUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/teams/${teamId}/athletes`;
+      console.log('Team roster URL:', rosterUrl);
+      
+      const response = await fetch(rosterUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Team Roster API response:', data);
+      return this.formatTeamRoster(data, teamId);
+    } catch (error) {
+      console.error(`Error fetching team roster for team ${teamId}:`, error);
+      return [];
+    }
+  }
+
+  // Format team roster data
+  formatTeamRoster(data, teamId) {
+    console.log('Formatting team roster data:', data);
+    if (!data || !data.items) {
+      console.log('No roster data available');
+      return [];
+    }
+    
+    const players = data.items.map(player => ({
+      id: player.id,
+      name: player.displayName,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      position: player.position?.abbreviation || 'N/A',
+      jersey: player.jersey || 'N/A',
+      teamId: teamId,
+      height: player.height,
+      weight: player.weight,
+      age: player.age,
+      experience: player.experience,
+      gameStats: {},
+      seasonStats: {}
+    }));
+    
+    console.log(`Formatted ${players.length} players for team ${teamId}`);
+    return players;
   }
 }
 

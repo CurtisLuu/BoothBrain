@@ -490,8 +490,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
-        <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-        <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+        <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} />} />
+        <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} />} />
         <Route path="/team" element={<TeamPage />} />
       </Routes>
     </Router>
