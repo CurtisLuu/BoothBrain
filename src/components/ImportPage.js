@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileText, Edit3, Download, Home, BarChart3, Calendar, Moon, Sun, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../contexts/DarkModeContext';
-import InteractivePDFEditor from './InteractivePDFEditor';
+import BackendPDFEditor from './BackendPDFEditor';
+import PDFJSEditor from './PDFJSEditor';
 
 const ImportPage = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const ImportPage = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPDFEditor, setShowPDFEditor] = useState(false);
+  const [usePDFJS, setUsePDFJS] = useState(true); // Toggle between PDF.js and Backend
   const fileInputRef = useRef(null);
 
   // Handle file upload
@@ -344,14 +346,44 @@ const ImportPage = () => {
         </div>
       </div>
 
-      {/* Interactive PDF Editor Modal */}
-      {showPDFEditor && (
-        <InteractivePDFEditor
-          file={uploadedFile}
-          onClose={handlePDFEditorClose}
-          onSave={handlePDFEditorSave}
-        />
-      )}
+        {/* PDF Editor Selection */}
+        <div className="mb-4">
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={usePDFJS}
+              onChange={() => setUsePDFJS(true)}
+              className="form-radio"
+            />
+            <span>PDF.js Editor (Frontend-only, More Reliable)</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={!usePDFJS}
+              onChange={() => setUsePDFJS(false)}
+              className="form-radio"
+            />
+            <span>Backend Editor (Python + PyMuPDF)</span>
+          </label>
+        </div>
+
+        {/* PDF Editor Modal */}
+        {showPDFEditor && (
+          usePDFJS ? (
+            <PDFJSEditor
+              file={uploadedFile}
+              onClose={handlePDFEditorClose}
+              onSave={handlePDFEditorSave}
+            />
+          ) : (
+            <BackendPDFEditor
+              file={uploadedFile}
+              onClose={handlePDFEditorClose}
+              onSave={handlePDFEditorSave}
+            />
+          )
+        )}
     </div>
   );
 };

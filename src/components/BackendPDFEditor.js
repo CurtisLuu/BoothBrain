@@ -1,24 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  Download, Save, Undo, Redo, Type, Pen, Eraser, X, 
+  Download, Save, Type, Pen, Eraser, X, 
   ZoomIn, ZoomOut, Highlighter, StickyNote, Trash2, 
-  MousePointer2, Square, Circle, 
-  RotateCw, Eye, EyeOff
+  MousePointer2, Square, Circle, Upload
 } from 'lucide-react';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
+const BackendPDFEditor = ({ file, onClose, onSave }) => {
   const canvasRef = useRef(null);
-  const [pdfDoc, setPdfDoc] = useState(null);
+  const [pdfInfo, setPdfInfo] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [pageImage, setPageImage] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [currentTool, setCurrentTool] = useState('pointer');
   const [currentColor, setCurrentColor] = useState('#000000');
   const [currentSize, setCurrentSize] = useState(2);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
   const [annotations, setAnnotations] = useState([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [textInput, setTextInput] = useState('');
@@ -27,21 +23,97 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [pageRotation, setPageRotation] = useState(0);
-  const [showLayers, setShowLayers] = useState(false);
-  const [layers, setLayers] = useState([
-    { id: 'background', name: 'Background', visible: true, locked: false },
-    { id: 'annotations', name: 'Annotations', visible: true, locked: false },
-    { id: 'drawings', name: 'Drawings', visible: true, locked: false }
-  ]);
-  const [activeLayer] = useState('annotations');
+  const [fileId, setFileId] = useState(null);
 
-  const renderAnnotations = useCallback((ctx) => {
-    const currentLayer = layers.find(l => l.id === activeLayer);
-    if (!currentLayer?.visible) return;
+  const API_BASE = 'http://localhost:8000';
 
+  const uploadPDF = useCallback(async (file) => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE}/upload-pdf`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload PDF');
+      }
+
+      const data = await response.json();
+      setPdfInfo(data);
+      setFileId(data.file_id);
+      
+      // Load first page
+      await loadPage(data.file_id, 0);
+      
+    } catch (error) {
+      console.error('Error uploading PDF:', error);
+      alert('Error uploading PDF. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadPage]);
+
+  // Upload PDF to backend
+  useEffect(() => {
+    if (file) {
+      uploadPDF(file);
+    }
+  }, [file, uploadPDF]);
+
+  const renderPage = useCallback((imageData, pageSize) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const img = new Image();
+    img.onload = () => {
+      // Set canvas size based on zoom
+      canvas.width = img.width * zoom;
+      canvas.height = img.height * zoom;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.scale(zoom, zoom);
+      
+      // Clear canvas
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, img.width, img.height);
+      
+      // Draw the PDF page
+      ctx.drawImage(img, 0, 0);
+      
+      // Render annotations on top
+      renderAnnotations(ctx, pageSize);
+    };
+    
+    img.src = `data:image/png;base64,${imageData}`;
+  }, [zoom, annotations, currentPage]);
+
+  const loadPage = useCallback(async (fileId, pageNum) => {
+    try {
+      const response = await fetch(`${API_BASE}/pdf-page/${fileId}/${pageNum}`);
+      if (!response.ok) {
+        throw new Error('Failed to load page');
+      }
+
+      const data = await response.json();
+      setPageImage(data.page_image);
+      setCurrentPage(pageNum);
+      
+      // Render the page
+      renderPage(data.page_image, data.page_size);
+      
+    } catch (error) {
+      console.error('Error loading page:', error);
+      alert('Error loading page. Please try again.');
+    }
+  }, [renderPage]);
+
+  const renderAnnotations = (ctx, pageSize) => {
     annotations.forEach(annotation => {
-      if (annotation.page !== currentPage || annotation.layer !== activeLayer) return;
+      if (annotation.page !== currentPage) return;
       
       ctx.save();
       
@@ -97,7 +169,6 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
           break;
           
         default:
-          // Handle unknown annotation types
           break;
       }
       
@@ -114,167 +185,6 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
       
       ctx.restore();
     });
-  }, [annotations, currentPage, activeLayer, layers, selectedAnnotation]);
-
-  const renderPDFPage = useCallback(async (pdfDoc, pageIndex) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    try {
-      const page = pdfDoc.getPage(pageIndex);
-      const { width, height } = page.getSize();
-      
-      // Set canvas size based on zoom
-      const scaledWidth = width * zoom;
-      const scaledHeight = height * zoom;
-      canvas.width = scaledWidth;
-      canvas.height = scaledHeight;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.scale(zoom, zoom);
-      
-      // Clear canvas
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
-      
-      // Create a professional document layout using pdf-lib concepts
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 20px Arial';
-      ctx.fillText('PDF Editor - Professional Version', 50, 40);
-      
-      ctx.font = '14px Arial';
-      ctx.fillStyle = '#666666';
-      ctx.fillText(`Page ${pageIndex + 1} of ${pdfDoc.getPageCount()}`, 50, 65);
-      
-      // Draw document border
-      ctx.strokeStyle = '#e0e0e0';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(50, 80, width - 100, height - 120);
-      
-      // Add sample content that represents the PDF
-      ctx.fillStyle = '#333333';
-      ctx.font = '16px Arial';
-      ctx.fillText('Document Content', 60, 110);
-      
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#666666';
-      ctx.fillText('This represents your uploaded PDF content', 60, 135);
-      ctx.fillText('You can draw, add text, highlight, and annotate here', 60, 155);
-      ctx.fillText('Use the pointer tool to move elements around', 60, 175);
-      
-      // Draw some sample elements using pdf-lib style
-      drawSampleElements(ctx, width, height);
-      
-      // Render annotations on top
-      renderAnnotations(ctx);
-      
-    } catch (error) {
-      console.error('Error rendering PDF page:', error);
-    }
-  }, [zoom, renderAnnotations]);
-
-  // Load PDF file using pdf-lib
-  const loadPDF = useCallback(async (file) => {
-    setIsLoading(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      setPdfDoc(pdfDoc);
-      setTotalPages(pdfDoc.getPageCount());
-      setCurrentPage(0);
-      
-      // Render first page
-      await renderPDFPage(pdfDoc, 0);
-      
-    } catch (error) {
-      console.error('Error loading PDF:', error);
-      alert('Error loading PDF file. Please try a different file.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [renderPDFPage]);
-
-  useEffect(() => {
-    if (file) {
-      loadPDF(file);
-    }
-  }, [file, loadPDF]);
-
-  const drawSampleElements = (ctx, width, height) => {
-    // Draw sample text box
-    ctx.strokeStyle = '#4CAF50';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(60, 200, 100, 30);
-    ctx.fillStyle = '#4CAF50';
-    ctx.font = '10px Arial';
-    ctx.fillText('Sample Box', 70, 220);
-    
-    // Draw sample circle
-    ctx.strokeStyle = '#2196F3';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(200, 215, 15, 0, 2 * Math.PI);
-    ctx.stroke();
-    ctx.fillStyle = '#2196F3';
-    ctx.fillText('Circle', 185, 240);
-    
-    // Draw sample rectangle
-    ctx.strokeStyle = '#FF9800';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(250, 200, 80, 40);
-    ctx.fillStyle = '#FF9800';
-    ctx.fillText('Rectangle', 260, 225);
-    
-    // Draw sample line
-    ctx.strokeStyle = '#9C27B0';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(60, 280);
-    ctx.lineTo(200, 280);
-    ctx.stroke();
-    ctx.fillStyle = '#9C27B0';
-    ctx.fillText('Line', 60, 295);
-  };
-
-  const saveToHistory = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const imageData = canvas.toDataURL();
-      const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push({ 
-        imageData, 
-        annotations: [...annotations],
-        page: currentPage 
-      });
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
-    }
-  };
-
-  const undo = () => {
-    if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1];
-      setAnnotations(prevState.annotations);
-      setHistoryIndex(historyIndex - 1);
-      
-      // Re-render the page
-      if (pdfDoc) {
-        renderPDFPage(pdfDoc, currentPage);
-      }
-    }
-  };
-
-  const redo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      setAnnotations(nextState.annotations);
-      setHistoryIndex(historyIndex + 1);
-      
-      // Re-render the page
-      if (pdfDoc) {
-        renderPDFPage(pdfDoc, currentPage);
-      }
-    }
   };
 
   const getMousePos = (e) => {
@@ -290,7 +200,7 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
     return annotations.find(annotation => {
       if (annotation.page !== currentPage) return false;
       
-      const margin = 10; // Click tolerance
+      const margin = 10;
       return x >= annotation.x - margin && 
              x <= annotation.x + (annotation.width || 100) + margin &&
              y >= annotation.y - margin && 
@@ -316,15 +226,14 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
     } else if (currentTool === 'pen' || currentTool === 'highlighter' || currentTool === 'eraser') {
       setIsDrawing(true);
       const newAnnotation = {
-        id: Date.now(),
+        id: Date.now().toString(),
         type: 'drawing',
         x: pos.x,
         y: pos.y,
         points: [pos],
         color: currentColor,
         size: currentSize,
-        page: currentPage,
-        layer: activeLayer
+        page: currentPage
       };
       setAnnotations([...annotations, newAnnotation]);
     } else if (currentTool === 'text') {
@@ -332,20 +241,18 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
       setShowTextInput(true);
     } else if (currentTool === 'sticky-note') {
       const newAnnotation = {
-        id: Date.now(),
+        id: Date.now().toString(),
         type: 'sticky-note',
         x: pos.x,
         y: pos.y,
         text: 'New Note',
         color: currentColor,
-        page: currentPage,
-        layer: activeLayer
+        page: currentPage
       };
       setAnnotations([...annotations, newAnnotation]);
-      saveToHistory();
     } else if (currentTool === 'rectangle') {
       const newAnnotation = {
-        id: Date.now(),
+        id: Date.now().toString(),
         type: 'rectangle',
         x: pos.x,
         y: pos.y,
@@ -353,14 +260,12 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
         height: 50,
         color: currentColor,
         size: currentSize,
-        page: currentPage,
-        layer: activeLayer
+        page: currentPage
       };
       setAnnotations([...annotations, newAnnotation]);
-      saveToHistory();
     } else if (currentTool === 'circle') {
       const newAnnotation = {
-        id: Date.now(),
+        id: Date.now().toString(),
         type: 'circle',
         x: pos.x,
         y: pos.y,
@@ -368,11 +273,9 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
         height: 100,
         color: currentColor,
         size: currentSize,
-        page: currentPage,
-        layer: activeLayer
+        page: currentPage
       };
       setAnnotations([...annotations, newAnnotation]);
-      saveToHistory();
     }
   };
 
@@ -404,31 +307,27 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
   const handleMouseUp = () => {
     if (isDrawing) {
       setIsDrawing(false);
-      saveToHistory();
     }
     if (isDragging) {
       setIsDragging(false);
-      saveToHistory();
     }
   };
 
   const addText = () => {
     if (textInput.trim()) {
       const newAnnotation = {
-        id: Date.now(),
+        id: Date.now().toString(),
         type: 'text',
         x: textPosition.x,
         y: textPosition.y,
         text: textInput,
         color: currentColor,
         size: currentSize * 8,
-        page: currentPage,
-        layer: activeLayer
+        page: currentPage
       };
       setAnnotations([...annotations, newAnnotation]);
       setTextInput('');
       setShowTextInput(false);
-      saveToHistory();
     }
   };
 
@@ -436,76 +335,73 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
     if (selectedAnnotation) {
       setAnnotations(annotations.filter(a => a.id !== selectedAnnotation.id));
       setSelectedAnnotation(null);
-      saveToHistory();
     }
   };
 
-  const exportAsPDF = async () => {
-    if (!pdfDoc) return;
+  const saveAnnotations = async () => {
+    if (!fileId) return;
     
     try {
       setIsLoading(true);
       
-      // Create a new PDF with annotations using pdf-lib
-      const newPdfDoc = await PDFDocument.create();
-      const pages = pdfDoc.getPages();
-      
-      for (let i = 0; i < pages.length; i++) {
-        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i]);
-        const page = newPdfDoc.addPage(copiedPage);
-        
-        // Add annotations to the page using pdf-lib
-        const pageAnnotations = annotations.filter(ann => ann.page === i);
-        const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
-        
-        for (const annotation of pageAnnotations) {
-          if (annotation.type === 'text') {
-            page.drawText(annotation.text, {
-              x: annotation.x,
-              y: annotation.y,
-              size: annotation.size || 12,
-              font: font,
-              color: rgb(0, 0, 0),
-            });
-          } else if (annotation.type === 'rectangle') {
-            page.drawRectangle({
-              x: annotation.x,
-              y: annotation.y,
-              width: annotation.width || 100,
-              height: annotation.height || 50,
-              borderColor: rgb(0, 0, 0),
-              borderWidth: annotation.size || 2,
-            });
-          } else if (annotation.type === 'circle') {
-            page.drawCircle({
-              x: annotation.x + (annotation.width || 50) / 2,
-              y: annotation.y + (annotation.height || 50) / 2,
-              size: (annotation.width || 50) / 2,
-              borderColor: rgb(0, 0, 0),
-              borderWidth: annotation.size || 2,
-            });
-          }
-        }
+      const response = await fetch(`${API_BASE}/add-annotations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_id: fileId,
+          annotations: annotations,
+          page: currentPage
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save annotations');
       }
+
+      alert('Annotations saved successfully!');
       
-      // Set document metadata using pdf-lib
-      newPdfDoc.setTitle(`Edited ${file.name}`);
-      newPdfDoc.setAuthor('PDF Editor');
-      newPdfDoc.setCreator('Football AI PDF Editor');
-      newPdfDoc.setCreationDate(new Date());
-      newPdfDoc.setModificationDate(new Date());
+    } catch (error) {
+      console.error('Error saving annotations:', error);
+      alert('Error saving annotations. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const exportPDF = async () => {
+    if (!fileId) return;
+    
+    try {
+      setIsLoading(true);
       
-      // Save the PDF
-      const pdfBytes = await newPdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
+      const response = await fetch(`${API_BASE}/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_id: fileId,
+          annotations: annotations,
+          page: currentPage
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export PDF');
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `edited_${file.name}`;
+      link.download = `edited_${pdfInfo?.filename || 'document'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
       
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -515,53 +411,30 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
     }
   };
 
-  const saveDocument = () => {
-    if (onSave) {
-      const canvas = canvasRef.current;
-      const imageData = canvas.toDataURL('image/png');
-      onSave(imageData);
-    }
-  };
-
   const nextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1);
-      renderPDFPage(pdfDoc, currentPage + 1);
+    if (currentPage < pdfInfo?.total_pages - 1) {
+      loadPage(fileId, currentPage + 1);
     }
   };
 
   const prevPage = () => {
     if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
-      renderPDFPage(pdfDoc, currentPage - 1);
+      loadPage(fileId, currentPage - 1);
     }
   };
 
   const zoomIn = () => {
     setZoom(Math.min(zoom * 1.2, 3));
-    if (pdfDoc) {
-      renderPDFPage(pdfDoc, currentPage);
+    if (pageImage) {
+      renderPage(pageImage, pdfInfo?.page_size);
     }
   };
 
   const zoomOut = () => {
     setZoom(Math.max(zoom / 1.2, 0.5));
-    if (pdfDoc) {
-      renderPDFPage(pdfDoc, currentPage);
+    if (pageImage) {
+      renderPage(pageImage, pdfInfo?.page_size);
     }
-  };
-
-  const rotatePage = () => {
-    setPageRotation((prev) => (prev + 90) % 360);
-    if (pdfDoc) {
-      renderPDFPage(pdfDoc, currentPage);
-    }
-  };
-
-  const toggleLayerVisibility = (layerId) => {
-    setLayers(layers.map(layer => 
-      layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-    ));
   };
 
   const tools = [
@@ -591,7 +464,18 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading PDF...</p>
+          <p className="text-gray-600 dark:text-gray-300">Processing PDF...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pdfInfo) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
+          <Upload className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-300">Uploading PDF to server...</p>
         </div>
       </div>
     );
@@ -603,7 +487,7 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Advanced PDF Editor</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">PDF Editor (Backend)</h2>
             <div className="flex items-center space-x-2">
               <button
                 onClick={prevPage}
@@ -613,11 +497,11 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
                 ←
               </button>
               <span className="text-sm text-gray-600 dark:text-gray-300 min-w-[80px] text-center">
-                {currentPage + 1} / {totalPages}
+                {currentPage + 1} / {pdfInfo.total_pages}
               </span>
               <button
                 onClick={nextPage}
-                disabled={currentPage === totalPages - 1}
+                disabled={currentPage === pdfInfo.total_pages - 1}
                 className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
               >
                 →
@@ -642,31 +526,6 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
               <ZoomIn className="w-4 h-4" />
             </button>
             
-            <button
-              onClick={rotatePage}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-              title="Rotate Page"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-            
-            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2"></div>
-            
-            <button
-              onClick={undo}
-              disabled={historyIndex <= 0}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
-            >
-              <Undo className="w-4 h-4" />
-            </button>
-            <button
-              onClick={redo}
-              disabled={historyIndex >= history.length - 1}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
-            >
-              <Redo className="w-4 h-4" />
-            </button>
-            
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2"></div>
             
             {selectedAnnotation && (
@@ -680,14 +539,14 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
             )}
             
             <button
-              onClick={saveDocument}
+              onClick={saveAnnotations}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <Save className="w-4 h-4" />
               <span>Save</span>
             </button>
             <button
-              onClick={exportAsPDF}
+              onClick={exportPDF}
               className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
               <Download className="w-4 h-4" />
@@ -704,7 +563,7 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
 
         <div className="flex flex-1">
           {/* Toolbar */}
-          <div className="w-80 bg-gray-50 dark:bg-gray-700 p-4 space-y-6 overflow-y-auto">
+          <div className="w-72 bg-gray-50 dark:bg-gray-700 p-4 space-y-6 overflow-y-auto">
             {/* Tools */}
             <div>
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Tools</h3>
@@ -761,46 +620,15 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* Layers */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Layers</h3>
-                <button
-                  onClick={() => setShowLayers(!showLayers)}
-                  className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-              </div>
-              {showLayers && (
-                <div className="space-y-2">
-                  {layers.map(layer => (
-                    <div key={layer.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-600 rounded">
-                      <span className="text-xs">{layer.name}</span>
-                      <button
-                        onClick={() => toggleLayerVisibility(layer.id)}
-                        className={`p-1 rounded ${
-                          layer.visible ? 'text-green-600' : 'text-gray-400'
-                        }`}
-                      >
-                        {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Instructions */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">How to Use</h4>
-              <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+              <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Backend Powered</h4>
+              <ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
+                <li>• <strong>Real PDF:</strong> Actual PDF content loaded</li>
                 <li>• <strong>Pointer:</strong> Click and drag to move elements</li>
-                <li>• <strong>Pen:</strong> Draw freehand on the PDF</li>
-                <li>• <strong>Text:</strong> Click to add text annotations</li>
-                <li>• <strong>Shapes:</strong> Click to add rectangles/circles</li>
-                <li>• <strong>Layers:</strong> Organize elements by layer</li>
-                <li>• <strong>Delete:</strong> Select element and click trash icon</li>
+                <li>• <strong>Tools:</strong> Draw, add text, shapes</li>
+                <li>• <strong>Save:</strong> Annotations saved to server</li>
+                <li>• <strong>Export:</strong> Download edited PDF</li>
               </ul>
             </div>
 
@@ -827,7 +655,6 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
                           if (selectedAnnotation && selectedAnnotation.id === annotation.id) {
                             setSelectedAnnotation(null);
                           }
-                          saveToHistory();
                         }}
                         className="text-red-500 hover:text-red-700"
                       >
@@ -852,8 +679,7 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
                 style={{ 
                   maxHeight: 'calc(100vh - 200px)',
                   cursor: currentTool === 'pointer' ? 'pointer' : 
-                          currentTool === 'text' ? 'text' : 'crosshair',
-                  transform: `rotate(${pageRotation}deg)`
+                          currentTool === 'text' ? 'text' : 'crosshair'
                 }}
               />
             </div>
@@ -898,4 +724,4 @@ const AdvancedPDFEditor = ({ file, onClose, onSave }) => {
   );
 };
 
-export default AdvancedPDFEditor;
+export default BackendPDFEditor;
