@@ -4,22 +4,166 @@ class SportsApiService {
     this.espnBaseUrl = 'https://site.api.espn.com/apis/site/v2/sports';
     this.nflUrl = `${this.espnBaseUrl}/football/nfl/scoreboard`;
     this.ncaaUrl = `${this.espnBaseUrl}/football/college-football/scoreboard`;
+    this.requestDelay = 1000; // 1 second delay between requests
+    this.lastRequestTime = 0;
   }
 
-  // Get current week number
+  // Add delay between API requests to avoid rate limiting
+  async delayRequest() {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.requestDelay) {
+      const delay = this.requestDelay - timeSinceLastRequest;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    this.lastRequestTime = Date.now();
+  }
+
+  // Helper function to resolve $ref objects
+  resolveRefObjects(obj) {
+    if (obj && typeof obj === 'object') {
+      if (obj.$ref) {
+        // Return a placeholder for $ref objects
+        return `[Reference: ${obj.$ref}]`;
+      }
+      
+      if (Array.isArray(obj)) {
+        return obj.map(item => this.resolveRefObjects(item));
+      }
+      
+      const resolved = {};
+      for (const [key, value] of Object.entries(obj)) {
+        resolved[key] = this.resolveRefObjects(value);
+      }
+      return resolved;
+    }
+    
+    return obj;
+  }
+
+  // Get current week number for NFL
   getCurrentWeek() {
     const now = new Date();
-    const startOfSeason = new Date(now.getFullYear(), 7, 1); // August 1st
-    const weeksSinceStart = Math.floor((now - startOfSeason) / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(1, weeksSinceStart + 1);
+    const currentYear = now.getFullYear();
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Handle 2025 season (current season)
+    if (currentYear === 2025) {
+      // NFL 2025 season started September 4, 2025 (Week 1)
+      if (currentDate >= '2025-09-04' && currentDate < '2025-09-11') return 1;
+      if (currentDate >= '2025-09-11' && currentDate < '2025-09-18') return 2;
+      if (currentDate >= '2025-09-18' && currentDate < '2025-09-25') return 3;
+      if (currentDate >= '2025-09-25' && currentDate < '2025-10-02') return 4;
+      if (currentDate >= '2025-10-02' && currentDate < '2025-10-09') return 5;
+      if (currentDate >= '2025-10-09' && currentDate < '2025-10-16') return 6;
+      if (currentDate >= '2025-10-16' && currentDate < '2025-10-23') return 7;
+      if (currentDate >= '2025-10-23' && currentDate < '2025-10-30') return 8;
+      if (currentDate >= '2025-10-30' && currentDate < '2025-11-06') return 9;
+      if (currentDate >= '2025-11-06' && currentDate < '2025-11-13') return 10;
+      if (currentDate >= '2025-11-13' && currentDate < '2025-11-20') return 11;
+      if (currentDate >= '2025-11-20' && currentDate < '2025-11-27') return 12;
+      if (currentDate >= '2025-11-27' && currentDate < '2025-12-04') return 13;
+      if (currentDate >= '2025-12-04' && currentDate < '2025-12-11') return 14;
+      if (currentDate >= '2025-12-11' && currentDate < '2025-12-18') return 15;
+      if (currentDate >= '2025-12-18' && currentDate < '2025-12-25') return 16;
+      if (currentDate >= '2025-12-25' && currentDate < '2026-01-01') return 17;
+      if (currentDate >= '2026-01-01' && currentDate < '2026-01-08') return 18;
+    }
+    
+    // Handle 2024 season (fallback)
+    if (currentYear === 2024) {
+      if (currentDate >= '2024-09-05' && currentDate < '2024-09-12') return 1;
+      if (currentDate >= '2024-09-12' && currentDate < '2024-09-19') return 2;
+      if (currentDate >= '2024-09-19' && currentDate < '2024-09-26') return 3;
+      if (currentDate >= '2024-09-26' && currentDate < '2024-10-03') return 4;
+      if (currentDate >= '2024-10-03' && currentDate < '2024-10-10') return 5;
+      if (currentDate >= '2024-10-10' && currentDate < '2024-10-17') return 6;
+      if (currentDate >= '2024-10-17' && currentDate < '2024-10-24') return 7;
+      if (currentDate >= '2024-10-24' && currentDate < '2024-10-31') return 8;
+      if (currentDate >= '2024-10-31' && currentDate < '2024-11-07') return 9;
+      if (currentDate >= '2024-11-07' && currentDate < '2024-11-14') return 10;
+      if (currentDate >= '2024-11-14' && currentDate < '2024-11-21') return 11;
+      if (currentDate >= '2024-11-21' && currentDate < '2024-11-28') return 12;
+      if (currentDate >= '2024-11-28' && currentDate < '2024-12-05') return 13;
+      if (currentDate >= '2024-12-05' && currentDate < '2024-12-12') return 14;
+      if (currentDate >= '2024-12-12' && currentDate < '2024-12-19') return 15;
+      if (currentDate >= '2024-12-19' && currentDate < '2024-12-26') return 16;
+      if (currentDate >= '2024-12-26' && currentDate < '2025-01-02') return 17;
+      if (currentDate >= '2025-01-02' && currentDate < '2025-01-09') return 18;
+    }
+    
+    // Fallback: calculate based on season start
+    const seasonStart = new Date(currentYear, 8, 4); // September 4th (month is 0-indexed)
+    const timeDiff = now - seasonStart;
+    const weeksSinceStart = Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
+    
+    return Math.max(1, Math.min(18, weeksSinceStart + 1));
+  }
+
+  // Get current week number for NCAA
+  getCurrentNCAAWeek() {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Handle 2025 season (current season)
+    if (currentYear === 2025) {
+      // NCAA 2025 season typically starts late August
+      if (currentDate >= '2025-08-23' && currentDate < '2025-08-30') return 1;
+      if (currentDate >= '2025-08-30' && currentDate < '2025-09-06') return 2;
+      if (currentDate >= '2025-09-06' && currentDate < '2025-09-13') return 3;
+      if (currentDate >= '2025-09-13' && currentDate < '2025-09-20') return 4;
+      if (currentDate >= '2025-09-20' && currentDate < '2025-09-27') return 5;
+      if (currentDate >= '2025-09-27' && currentDate < '2025-10-04') return 6;
+      if (currentDate >= '2025-10-04' && currentDate < '2025-10-11') return 7;
+      if (currentDate >= '2025-10-11' && currentDate < '2025-10-18') return 8;
+      if (currentDate >= '2025-10-18' && currentDate < '2025-10-25') return 9;
+      if (currentDate >= '2025-10-25' && currentDate < '2025-11-01') return 10;
+      if (currentDate >= '2025-11-01' && currentDate < '2025-11-08') return 11;
+      if (currentDate >= '2025-11-08' && currentDate < '2025-11-15') return 12;
+      if (currentDate >= '2025-11-15' && currentDate < '2025-11-22') return 13;
+      if (currentDate >= '2025-11-22' && currentDate < '2025-11-29') return 14;
+      if (currentDate >= '2025-11-29' && currentDate < '2025-12-06') return 15;
+    }
+    
+    // Handle 2024 season (fallback)
+    if (currentYear === 2024) {
+      if (currentDate >= '2024-08-24' && currentDate < '2024-08-31') return 1;
+      if (currentDate >= '2024-08-31' && currentDate < '2024-09-07') return 2;
+      if (currentDate >= '2024-09-07' && currentDate < '2024-09-14') return 3;
+      if (currentDate >= '2024-09-14' && currentDate < '2024-09-21') return 4;
+      if (currentDate >= '2024-09-21' && currentDate < '2024-09-28') return 5;
+      if (currentDate >= '2024-09-28' && currentDate < '2024-10-05') return 6;
+      if (currentDate >= '2024-10-05' && currentDate < '2024-10-12') return 7;
+      if (currentDate >= '2024-10-12' && currentDate < '2024-10-19') return 8;
+      if (currentDate >= '2024-10-19' && currentDate < '2024-10-26') return 9;
+      if (currentDate >= '2024-10-26' && currentDate < '2024-11-02') return 10;
+      if (currentDate >= '2024-11-02' && currentDate < '2024-11-09') return 11;
+      if (currentDate >= '2024-11-09' && currentDate < '2024-11-16') return 12;
+      if (currentDate >= '2024-11-16' && currentDate < '2024-11-23') return 13;
+      if (currentDate >= '2024-11-23' && currentDate < '2024-11-30') return 14;
+      if (currentDate >= '2024-11-30' && currentDate < '2024-12-07') return 15;
+    }
+    
+    // Fallback to calculated week
+    const seasonStart = new Date(currentYear, 7, 23); // August 23rd (month is 0-indexed)
+    const timeDiff = now - seasonStart;
+    const weeksSinceStart = Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(1, Math.min(15, weeksSinceStart + 1));
   }
 
   // Get NFL games from ESPN API
   async getNFLGames() {
     try {
-      console.log('Fetching NFL games from ESPN API...');
+      const currentWeek = this.getCurrentWeek();
+      console.log(`Fetching NFL games for week ${currentWeek} from ESPN API...`);
       
-      const response = await fetch(this.nflUrl, {
+      const weekUrl = `${this.nflUrl}?week=${currentWeek}`;
+      await this.delayRequest();
+      
+      const response = await fetch(weekUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -28,17 +172,23 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN NFL API response:', data);
       console.log('Current week NFL events found:', data.events ? data.events.length : 0);
-      console.log('NFL API URL used:', this.nflUrl);
-      console.log('NFL week info:', data.week);
-      
-      return this.formatESPNGames(data.events || [], 'nfl');
+
+      // Resolve $ref objects to prevent rendering issues
+      const resolvedData = this.resolveRefObjects(data);
+      return resolvedData.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching NFL games from ESPN:', error);
       return [];
     }
@@ -47,9 +197,13 @@ class SportsApiService {
   // Get NCAA games from ESPN API
   async getNCAAGames() {
     try {
-      console.log('Fetching NCAA games from ESPN API...');
+      const currentWeek = this.getCurrentNCAAWeek();
+      console.log(`Fetching NCAA games for week ${currentWeek} from ESPN API...`);
       
-      const response = await fetch(this.ncaaUrl, {
+      const weekUrl = `${this.ncaaUrl}?week=${currentWeek}`;
+      await this.delayRequest();
+      
+      const response = await fetch(weekUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -58,17 +212,23 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN NCAA API response:', data);
       console.log('Current week NCAA events found:', data.events ? data.events.length : 0);
-      console.log('NCAA API URL used:', this.ncaaUrl);
-      console.log('NCAA week info:', data.week);
-      
-      return this.formatESPNGames(data.events || [], 'ncaa');
+
+      // Resolve $ref objects to prevent rendering issues
+      const resolvedData = this.resolveRefObjects(data);
+      return resolvedData.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching NCAA games from ESPN:', error);
       return [];
     }
@@ -77,31 +237,12 @@ class SportsApiService {
   // Get previous week NFL games from ESPN API
   async getPreviousWeekNFLGames() {
     try {
-      console.log('Fetching previous week NFL games from ESPN API...');
-      
-      // First, get current week to determine previous week number
-      const currentResponse = await fetch(this.nflUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!currentResponse.ok) {
-        throw new Error(`ESPN API error: ${currentResponse.status}`);
-      }
-
-      const currentData = await currentResponse.json();
-      const currentWeek = currentData.week?.number || 1;
+      const currentWeek = this.getCurrentWeek();
       const previousWeek = Math.max(1, currentWeek - 1);
+      console.log(`Fetching previous week (${previousWeek}) NFL games from ESPN API...`);
       
-      console.log('Current week:', currentWeek);
-      console.log('Previous week:', previousWeek);
-      
-      // Fetch games from previous week
       const previousWeekUrl = `${this.nflUrl}?week=${previousWeek}`;
-      console.log('Previous week URL:', previousWeekUrl);
+      await this.delayRequest();
       
       const response = await fetch(previousWeekUrl, {
         method: 'GET',
@@ -112,17 +253,21 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN Previous Week NFL API response:', data);
-      console.log('Previous week events found:', data.events ? data.events.length : 0);
-      console.log('Previous week NFL URL used:', previousWeekUrl);
-      console.log('Previous week NFL week info:', data.week);
+      console.log('Previous week NFL events found:', data.events ? data.events.length : 0);
       
-      return this.formatESPNGames(data.events || [], 'nfl');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching previous week NFL games from ESPN:', error);
       return [];
     }
@@ -131,31 +276,12 @@ class SportsApiService {
   // Get previous week NCAA games from ESPN API
   async getPreviousWeekNCAAGames() {
     try {
-      console.log('Fetching previous week NCAA games from ESPN API...');
-      
-      // First, get current week to determine previous week number
-      const currentResponse = await fetch(this.ncaaUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!currentResponse.ok) {
-        throw new Error(`ESPN API error: ${currentResponse.status}`);
-      }
-
-      const currentData = await currentResponse.json();
-      const currentWeek = currentData.week?.number || 1;
+      const currentWeek = this.getCurrentNCAAWeek();
       const previousWeek = Math.max(1, currentWeek - 1);
+      console.log(`Fetching previous week (${previousWeek}) NCAA games from ESPN API...`);
       
-      console.log('Current NCAA week:', currentWeek);
-      console.log('Previous NCAA week:', previousWeek);
-      
-      // Fetch games from previous week
       const previousWeekUrl = `${this.ncaaUrl}?week=${previousWeek}`;
-      console.log('Previous week NCAA URL:', previousWeekUrl);
+      await this.delayRequest();
       
       const response = await fetch(previousWeekUrl, {
         method: 'GET',
@@ -166,17 +292,21 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN Previous Week NCAA API response:', data);
       console.log('Previous week NCAA events found:', data.events ? data.events.length : 0);
-      console.log('Previous week NCAA URL used:', previousWeekUrl);
-      console.log('Previous week NCAA week info:', data.week);
       
-      return this.formatESPNGames(data.events || [], 'ncaa');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching previous week NCAA games from ESPN:', error);
       return [];
     }
@@ -185,31 +315,12 @@ class SportsApiService {
   // Get next week NFL games from ESPN API
   async getNextWeekNFLGames() {
     try {
-      console.log('Fetching next week NFL games from ESPN API...');
+      const currentWeek = this.getCurrentWeek();
+      const nextWeek = Math.min(18, currentWeek + 1);
+      console.log(`Fetching next week (${nextWeek}) NFL games from ESPN API...`);
       
-      // First, get current week to determine next week number
-      const currentResponse = await fetch(this.nflUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!currentResponse.ok) {
-        throw new Error(`ESPN API error: ${currentResponse.status}`);
-      }
-
-      const currentData = await currentResponse.json();
-      const currentWeek = currentData.week?.number || 1;
-      const nextWeek = currentWeek + 1;
-      
-      console.log('Current week:', currentWeek);
-      console.log('Next week:', nextWeek);
-      
-      // Fetch games from next week
       const nextWeekUrl = `${this.nflUrl}?week=${nextWeek}`;
-      console.log('Next week URL:', nextWeekUrl);
+      await this.delayRequest();
       
       const response = await fetch(nextWeekUrl, {
         method: 'GET',
@@ -220,17 +331,21 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN Next Week NFL API response:', data);
-      console.log('Next week events found:', data.events ? data.events.length : 0);
-      console.log('Next week NFL URL used:', nextWeekUrl);
-      console.log('Next week NFL week info:', data.week);
+      console.log('Next week NFL events found:', data.events ? data.events.length : 0);
       
-      return this.formatESPNGames(data.events || [], 'nfl');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching next week NFL games from ESPN:', error);
       return [];
     }
@@ -239,31 +354,12 @@ class SportsApiService {
   // Get next week NCAA games from ESPN API
   async getNextWeekNCAAGames() {
     try {
-      console.log('Fetching next week NCAA games from ESPN API...');
+      const currentWeek = this.getCurrentNCAAWeek();
+      const nextWeek = Math.min(15, currentWeek + 1);
+      console.log(`Fetching next week (${nextWeek}) NCAA games from ESPN API...`);
       
-      // First, get current week to determine next week number
-      const currentResponse = await fetch(this.ncaaUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!currentResponse.ok) {
-        throw new Error(`ESPN API error: ${currentResponse.status}`);
-      }
-
-      const currentData = await currentResponse.json();
-      const currentWeek = currentData.week?.number || 1;
-      const nextWeek = currentWeek + 1;
-      
-      console.log('Current NCAA week:', currentWeek);
-      console.log('Next NCAA week:', nextWeek);
-      
-      // Fetch games from next week
       const nextWeekUrl = `${this.ncaaUrl}?week=${nextWeek}`;
-      console.log('Next week NCAA URL:', nextWeekUrl);
+      await this.delayRequest();
       
       const response = await fetch(nextWeekUrl, {
         method: 'GET',
@@ -274,17 +370,21 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('ESPN Next Week NCAA API response:', data);
       console.log('Next week NCAA events found:', data.events ? data.events.length : 0);
-      console.log('Next week NCAA URL used:', nextWeekUrl);
-      console.log('Next week NCAA week info:', data.week);
       
-      return this.formatESPNGames(data.events || [], 'ncaa');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error('Error fetching next week NCAA games from ESPN:', error);
       return [];
     }
@@ -296,6 +396,7 @@ class SportsApiService {
       console.log(`Fetching NFL games for week ${week} from ESPN API...`);
       
       const weekUrl = `${this.nflUrl}?week=${week}`;
+      await this.delayRequest();
       
       const response = await fetch(weekUrl, {
         method: 'GET',
@@ -306,139 +407,23 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log(`ESPN NFL Week ${week} API response:`, data);
       console.log(`Week ${week} NFL events found:`, data.events ? data.events.length : 0);
-      console.log(`NFL Week ${week} API URL used:`, weekUrl);
-      console.log(`NFL Week ${week} info:`, data.week);
       
-      return this.formatESPNGames(data.events || [], 'nfl');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error(`Error fetching NFL games for week ${week} from ESPN:`, error);
       return [];
-    }
-  }
-
-  // Get team statistics for a specific team
-  async getTeamStats(teamName, league) {
-    try {
-      console.log(`Fetching team stats for ${teamName} in ${league} from ESPN API...`);
-      
-      // Search for team in current season games to get team ID
-      const teamId = await this.findTeamId(teamName, league);
-      if (!teamId) {
-        console.log(`Team ID not found for ${teamName}`);
-        return null;
-      }
-
-      // Get team statistics
-      const teamStatsUrl = `https://site.api.espn.com/apis/site/v2/sports/football/${league}/teams/${teamId}/stats`;
-      
-      const response = await fetch(teamStatsUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`ESPN API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(`Team stats for ${teamName}:`, data);
-      
-      return this.formatTeamStats(data, teamName);
-    } catch (error) {
-      console.error(`Error fetching team stats for ${teamName}:`, error);
-      return null;
-    }
-  }
-
-  // Find team ID by searching through games
-  async findTeamId(teamName, league) {
-    try {
-      console.log(`Searching for team ID for ${teamName} in ${league}...`);
-      
-      // Get current week games to find team
-      const currentWeek = this.getCurrentWeek();
-      const games = await this.getNFLGamesByWeek(currentWeek);
-      
-      // Search for team in games
-      const teamGame = games.find(game => 
-        game.awayTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-        game.homeTeam.toLowerCase().includes(teamName.toLowerCase())
-      );
-      
-      if (teamGame) {
-        // Extract team ID from game data
-        const teamId = teamGame.awayTeam.toLowerCase().includes(teamName.toLowerCase()) 
-          ? teamGame.awayTeamId 
-          : teamGame.homeTeamId;
-        console.log(`Found team ID for ${teamName}:`, teamId);
-        return teamId;
-      }
-      
-      console.log(`Team ID not found for ${teamName}`);
-      return null;
-    } catch (error) {
-      console.error(`Error finding team ID for ${teamName}:`, error);
-      return null;
-    }
-  }
-
-  // Format team statistics from ESPN API
-  formatTeamStats(data, teamName) {
-    try {
-      console.log('Formatting team stats for:', teamName);
-      
-      if (!data || !data.stats) {
-        console.log('No team stats data available');
-        return null;
-      }
-
-      const stats = data.stats;
-      const teamStats = {
-        teamName: teamName,
-        season: data.season || new Date().getFullYear(),
-        stats: {
-          offense: {},
-          defense: {},
-          specialTeams: {}
-        }
-      };
-
-      // Process offensive stats
-      if (stats.offense) {
-        teamStats.stats.offense = {
-          pointsPerGame: stats.offense.pointsPerGame || 0,
-          totalYards: stats.offense.totalYards || 0,
-          passingYards: stats.offense.passingYards || 0,
-          rushingYards: stats.offense.rushingYards || 0,
-          turnovers: stats.offense.turnovers || 0
-        };
-      }
-
-      // Process defensive stats
-      if (stats.defense) {
-        teamStats.stats.defense = {
-          pointsAllowedPerGame: stats.defense.pointsAllowedPerGame || 0,
-          totalYardsAllowed: stats.defense.totalYardsAllowed || 0,
-          passingYardsAllowed: stats.defense.passingYardsAllowed || 0,
-          rushingYardsAllowed: stats.defense.rushingYardsAllowed || 0,
-          takeaways: stats.defense.takeaways || 0
-        };
-      }
-
-      console.log('Formatted team stats:', teamStats);
-      return teamStats;
-    } catch (error) {
-      console.error('Error formatting team stats:', error);
-      return null;
     }
   }
 
@@ -448,6 +433,7 @@ class SportsApiService {
       console.log(`Fetching NCAA games for week ${week} from ESPN API...`);
       
       const weekUrl = `${this.ncaaUrl}?week=${week}`;
+      await this.delayRequest();
       
       const response = await fetch(weekUrl, {
         method: 'GET',
@@ -458,30 +444,104 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return [];
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log(`ESPN NCAA Week ${week} API response:`, data);
       console.log(`Week ${week} NCAA events found:`, data.events ? data.events.length : 0);
-      console.log(`NCAA Week ${week} API URL used:`, weekUrl);
-      console.log(`NCAA Week ${week} info:`, data.week);
       
-      return this.formatESPNGames(data.events || [], 'ncaa');
+      return data.events || [];
     } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return [];
+      }
       console.error(`Error fetching NCAA games for week ${week} from ESPN:`, error);
       return [];
     }
   }
 
-  // Get game summary with detailed player statistics
-  async getGameSummary(eventId, league = 'nfl') {
+  // Get team statistics for a specific team
+  async getTeamStats(teamName, league) {
     try {
-      console.log(`Fetching game summary for event ${eventId} from ESPN API...`);
+      console.log(`Fetching team stats for ${teamName} in ${league}...`);
       
-      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
-      const summaryUrl = `${this.espnBaseUrl}/${sport}/summary?event=${eventId}`;
-      console.log('Game summary URL:', summaryUrl);
+      // Get current week games to find team stats
+      const currentWeek = league === 'nfl' ? this.getCurrentWeek() : this.getCurrentNCAAWeek();
+      const games = league === 'nfl' ? await this.getNFLGamesByWeek(currentWeek) : await this.getNCAAGamesByWeek(currentWeek);
+      
+      // Find team in games and extract stats
+      let teamStats = {
+        teamName: teamName,
+        league: league,
+        wins: 0,
+        losses: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        games: []
+      };
+      
+      // Look through games to find team stats
+      for (const game of games) {
+        if (game.competitions && game.competitions[0]) {
+          const competition = game.competitions[0];
+          if (competition.competitors) {
+            const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+            const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+            
+            if (homeTeam && awayTeam) {
+              const homeTeamName = homeTeam.team?.displayName || homeTeam.team?.name;
+              const awayTeamName = awayTeam.team?.displayName || awayTeam.team?.name;
+              
+              if (homeTeamName === teamName || awayTeamName === teamName) {
+                const teamCompetitor = homeTeamName === teamName ? homeTeam : awayTeam;
+                const opponentCompetitor = homeTeamName === teamName ? awayTeam : homeTeam;
+                
+                const teamScore = parseInt(teamCompetitor.score || 0);
+                const opponentScore = parseInt(opponentCompetitor.score || 0);
+                
+                teamStats.pointsFor += teamScore;
+                teamStats.pointsAgainst += opponentScore;
+                
+                if (teamScore > opponentScore) {
+                  teamStats.wins++;
+                } else if (teamScore < opponentScore) {
+                  teamStats.losses++;
+                }
+                
+                teamStats.games.push({
+                  opponent: opponentCompetitor.team?.displayName || opponentCompetitor.team?.name,
+                  teamScore: teamScore,
+                  opponentScore: opponentScore,
+                  date: game.date,
+                  status: game.status?.type?.name
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`Team stats for ${teamName}:`, teamStats);
+      return teamStats;
+    } catch (error) {
+      console.error(`Error fetching team stats for ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Get game summary from ESPN API
+  async getGameSummary(gameId, league) {
+    try {
+      console.log(`Fetching game summary for ${gameId} in ${league}...`);
+      
+      const leaguePath = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const summaryUrl = `${this.espnBaseUrl}/${leaguePath}/summary?event=${gameId}`;
+      
+      await this.delayRequest();
       
       const response = await fetch(summaryUrl, {
         method: 'GET',
@@ -492,29 +552,39 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return null;
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('ESPN Game Summary API response:', data);
+      console.log(`Game summary for ${gameId}:`, data);
       
-      return this.formatGameSummary(data, league);
+      // Resolve $ref objects to prevent rendering issues
+      const resolvedData = this.resolveRefObjects(data);
+      return resolvedData;
     } catch (error) {
-      console.error('Error fetching game summary from ESPN:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return null;
+      }
+      console.error(`Error fetching game summary for ${gameId}:`, error);
       return null;
     }
   }
 
-  // Get comprehensive game boxscore with all player statistics
-  async getGameBoxscore(eventId, league = 'nfl') {
+  // Get game boxscore from ESPN API
+  async getGameBoxscore(gameId, league) {
     try {
-      console.log(`Fetching game boxscore for event ${eventId} from ESPN API...`);
+      console.log(`Fetching game boxscore for ${gameId} in ${league}...`);
       
-      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
-      const boxscoreUrl = `${this.espnBaseUrl}/${sport}/boxscore?event=${eventId}`;
-      console.log('Game boxscore URL:', boxscoreUrl);
+      // Try the summary endpoint first as it contains boxscore data
+      const leaguePath = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const summaryUrl = `${this.espnBaseUrl}/${leaguePath}/summary?event=${gameId}`;
       
-      const response = await fetch(boxscoreUrl, {
+      await this.delayRequest();
+      
+      const response = await fetch(summaryUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -523,29 +593,44 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return null;
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('ESPN Game Boxscore API response:', data);
+      console.log(`Game boxscore for ${gameId}:`, data);
       
-      return this.formatGameBoxscore(data, league);
+      // Resolve $ref objects to prevent rendering issues
+      const resolvedData = this.resolveRefObjects(data);
+      
+      // Extract boxscore data from summary response
+      if (resolvedData.boxscore) {
+        return resolvedData.boxscore;
+      }
+      
+      return resolvedData;
     } catch (error) {
-      console.error('Error fetching game boxscore from ESPN:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return null;
+      }
+      console.error(`Error fetching game boxscore for ${gameId}:`, error);
       return null;
     }
   }
 
-  // Get play-by-play data for more detailed game information
-  async getGamePlayByPlay(eventId, league = 'nfl') {
+  // Get game details from ESPN API
+  async getGameDetails(gameId, league) {
     try {
-      console.log(`Fetching play-by-play for event ${eventId} from ESPN API...`);
+      console.log(`Fetching game details for ${gameId} in ${league}...`);
       
-      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
-      const playByPlayUrl = `${this.espnBaseUrl}/${sport}/playbyplay?event=${eventId}`;
-      console.log('Play-by-play URL:', playByPlayUrl);
+      const leaguePath = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const detailsUrl = `${this.espnBaseUrl}/${leaguePath}/playbyplay?event=${gameId}`;
       
-      const response = await fetch(playByPlayUrl, {
+      await this.delayRequest();
+      
+      const response = await fetch(detailsUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -554,89 +639,36 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+      return null;
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('ESPN Play-by-play API response:', data);
+      console.log(`Game details for ${gameId}:`, data);
       
-      return data;
+      // Resolve $ref objects to prevent rendering issues
+      const resolvedData = this.resolveRefObjects(data);
+      return resolvedData;
     } catch (error) {
-      console.error('Error fetching play-by-play from ESPN:', error);
-      return null;
-    }
-  }
-
-  // Get detailed game data using ESPN's core API
-  async getGameDetails(gameId, league = 'nfl') {
-    try {
-      console.log(`Fetching detailed game data for ${gameId} in ${league}...`);
-      
-      // Use ESPN's core API for detailed game information
-      const gameUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/${league}/events/${gameId}`;
-      console.log('Game details URL:', gameUrl);
-      
-      const response = await fetch(gameUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`ESPN Core API error: ${response.status}`);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        return null;
       }
-
-      const data = await response.json();
-      console.log('Game details API response:', data);
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching game details from ESPN Core API:', error);
+      console.error(`Error fetching game details for ${gameId}:`, error);
       return null;
     }
   }
 
-  // Get team statistics using ESPN's core API
-  async getTeamStatistics(teamId, league = 'nfl') {
-    try {
-      console.log(`Fetching team statistics for ${teamId} in ${league}...`);
-      
-      // Use ESPN's core API for team statistics
-      const teamUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/${league}/teams/${teamId}/statistics`;
-      console.log('Team stats URL:', teamUrl);
-      
-      const response = await fetch(teamUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`ESPN Core API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Team statistics API response:', data);
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching team statistics from ESPN Core API:', error);
-      return null;
-    }
-  }
-
-  // Get athlete statistics and splits
+  // Get athlete statistics from ESPN API
   async getAthleteStats(athleteId, league = 'nfl') {
     try {
-      console.log(`Fetching athlete stats for ${athleteId} from ESPN API...`);
+      console.log(`Fetching athlete stats for ${athleteId} in ${league}...`);
       
-      const sport = league === 'nfl' ? 'football/nfl' : 'football/college-football';
-      const athleteUrl = `https://site.web.api.espn.com/apis/common/v3/sports/${sport}/athletes/${athleteId}/splits`;
-      console.log('Athlete stats URL:', athleteUrl);
+      const leaguePath = league === 'nfl' ? 'football/nfl' : 'football/college-football';
+      const athleteUrl = `${this.espnBaseUrl}/${leaguePath}/athletes/${athleteId}/stats`;
+      
+      await this.delayRequest();
       
       const response = await fetch(athleteUrl, {
         method: 'GET',
@@ -647,405 +679,72 @@ class SportsApiService {
       });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 0) {
+          return null;
+        }
         throw new Error(`ESPN API error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('ESPN Athlete Stats API response:', data);
-      
-      return this.formatAthleteStats(data, league);
+      console.log(`Athlete stats for ${athleteId}:`, data);
+      return data;
     } catch (error) {
-      console.error('Error fetching athlete stats from ESPN:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
       return null;
-    }
-  }
-
-  // Format ESPN API data to our game format
-  formatESPNGames(events, league) {
-    if (!events || events.length === 0) {
-      console.log(`No events found for ${league}, returning empty array`);
-      return [];
-    }
-
-    console.log(`Formatting ${events.length} ${league} games from ESPN API`);
-
-    return events.map((event, index) => {
-      const competition = event.competitions[0];
-      const homeTeam = competition.competitors.find(team => team.homeAway === 'home');
-      const awayTeam = competition.competitors.find(team => team.homeAway === 'away');
-      
-      return {
-        id: event.id || index + 1,
-        homeTeam: homeTeam?.team?.displayName || 'Home Team',
-        awayTeam: awayTeam?.team?.displayName || 'Away Team',
-        homeScore: parseInt(homeTeam?.score) || 0,
-        awayScore: parseInt(awayTeam?.score) || 0,
-        status: this.getGameStatus(competition.status?.type?.name),
-        time: this.formatGameTime(event.date),
-        date: this.formatGameDate(event.date),
-        week: this.getWeekNumber(event.date, league),
-        league: league
-      };
-    });
-  }
-
-  // Format game summary data with player statistics
-  formatGameSummary(data, league) {
-    console.log('Raw ESPN API response structure:', data);
-    
-    if (!data) {
-      console.log('No data available from ESPN API');
-      return null;
-    }
-
-    // Check different possible data structures
-    let players = [];
-    let gameInfo = null;
-
-    // Try different possible paths for player data
-    if (data.boxscore && data.boxscore.players) {
-      players = data.boxscore.players;
-      console.log('Found players in data.boxscore.players:', players.length);
-    } else if (data.players) {
-      players = data.players;
-      console.log('Found players in data.players:', players.length);
-    } else if (data.boxscore && data.boxscore.teams) {
-      // Try to extract players from teams
-      const teams = data.boxscore.teams;
-      players = [];
-      teams.forEach(team => {
-        if (team.statistics && team.statistics[0] && team.statistics[0].athletes) {
-          players = players.concat(team.statistics[0].athletes);
-        }
-      });
-      console.log('Found players in data.boxscore.teams:', players.length);
-    } else {
-      console.log('No player data found in any expected location');
-      console.log('Available data keys:', Object.keys(data));
-      if (data.boxscore) {
-        console.log('Boxscore keys:', Object.keys(data.boxscore));
       }
-    }
-
-    // Get game info
-    if (data.header) {
-      gameInfo = data.header;
-    } else if (data.gameInfo) {
-      gameInfo = data.gameInfo;
-    }
-
-    console.log(`Formatting game summary with ${players.length} players`);
-
-    const playerStats = players.map((player, index) => {
-      // Handle different player data structures
-      let playerData = player;
-      let stats = [];
-      
-      if (player.athlete) {
-        playerData = player.athlete;
-        stats = player.stats || [];
-      } else if (player.stats) {
-        stats = player.stats;
-      }
-
-      const seasonStats = stats.find(stat => stat.label === 'Season') || { stats: [] };
-      const gameStats = stats.find(stat => stat.label === 'Game') || { stats: [] };
-      
-      return {
-        id: playerData?.id || player.id || `player-${index}`,
-        name: playerData?.displayName || player.displayName || `Player ${index + 1}`,
-        position: playerData?.position?.abbreviation || player.position || 'N/A',
-        team: player.team?.displayName || player.team || 'Unknown Team',
-        jersey: playerData?.jersey || player.jersey || 'N/A',
-        seasonStats: this.formatPlayerStats(seasonStats.stats, league),
-        gameStats: this.formatPlayerStats(gameStats.stats, league)
-      };
-    });
-
-    return {
-      gameId: gameInfo?.id || data.id,
-      gameInfo: gameInfo,
-      players: playerStats
-    };
-  }
-
-  // Format game boxscore data with comprehensive player statistics
-  formatGameBoxscore(data, league) {
-    console.log('Raw ESPN Boxscore API response structure:', data);
-    
-    if (!data) {
-      console.log('No boxscore data available from ESPN API');
+      console.error(`Error fetching athlete stats for ${athleteId}:`, error);
       return null;
     }
+  }
 
-    let players = [];
-    let gameInfo = null;
-    let teamStats = {};
-
-    // Extract game info
-    if (data.header) {
-      gameInfo = data.header;
-    }
-
-    // Extract team statistics
-    if (data.boxscore && data.boxscore.teams) {
-      const teams = data.boxscore.teams;
-      teams.forEach(team => {
-        const teamName = team.team?.displayName || 'Unknown Team';
-        teamStats[teamName] = {
-          score: team.score || 0,
-          statistics: team.statistics || []
-        };
-      });
-    }
-
-    // Extract players from boxscore
-    if (data.boxscore && data.boxscore.teams) {
-      const teams = data.boxscore.teams;
-      players = [];
+  // Get player statistics from game data
+  async getPlayerStats(gameId, league) {
+    try {
+      console.log(`Fetching player stats for game ${gameId} in ${league}...`);
       
-      teams.forEach(team => {
-        const teamName = team.team?.displayName || 'Unknown Team';
-        
-        // Get all statistics categories for this team
-        if (team.statistics) {
-          team.statistics.forEach(statCategory => {
-            if (statCategory.athletes) {
-              statCategory.athletes.forEach(athlete => {
-                if (athlete.athlete) {
-                  const playerData = athlete.athlete;
-                  const stats = athlete.stats || [];
-                  
-                  // Check if we already have this player
-                  const existingPlayer = players.find(p => p.id === playerData.id);
-                  
-                  if (existingPlayer) {
-                    // Add stats to existing player
-                    existingPlayer.gameStats = {
-                      ...existingPlayer.gameStats,
-                      ...this.formatPlayerStats(stats, league)
-                    };
-                  } else {
-                    // Create new player
-                    players.push({
-                      id: playerData.id || `player-${players.length}`,
-                      name: playerData.displayName || `Player ${players.length + 1}`,
-                      position: playerData.position?.abbreviation || 'N/A',
-                      team: teamName,
-                      jersey: playerData.jersey || 'N/A',
-                      gameStats: this.formatPlayerStats(stats, league),
-                      seasonStats: {} // Will be filled by other API calls
-                    });
-                  }
-                }
+      // Get game summary which contains player stats
+      const gameSummary = await this.getGameSummary(gameId, league);
+      
+      if (!gameSummary) {
+        return null;
+      }
+      
+      // Extract player stats from the game summary
+      const playerStats = {
+        gameId: gameId,
+        league: league,
+        players: []
+      };
+      
+      // Look for player stats in different parts of the response
+      if (gameSummary.boxscore && gameSummary.boxscore.players) {
+        playerStats.players = gameSummary.boxscore.players;
+      } else if (gameSummary.leaders) {
+        // Extract from leaders section
+        for (const leader of gameSummary.leaders) {
+          if (leader.leaders && leader.leaders[0] && leader.leaders[0].leaders) {
+            for (const player of leader.leaders[0].leaders) {
+              playerStats.players.push({
+                name: player.athlete?.displayName || player.athlete?.fullName,
+                position: player.athlete?.position?.displayName,
+                team: player.team?.displayName,
+                stats: player.stats,
+                category: leader.displayName
               });
             }
-          });
+          }
         }
-      });
-    }
-
-    console.log(`Formatting boxscore with ${players.length} players`);
-
-    return {
-      gameId: gameInfo?.id || data.id,
-      gameInfo: gameInfo,
-      teamStats: teamStats,
-      players: players
-    };
-  }
-
-  // Format athlete statistics data
-  formatAthleteStats(data, league) {
-    if (!data || !data.splits) {
-      console.log('No athlete splits data available');
+      }
+      
+      console.log(`Player stats for game ${gameId}:`, playerStats);
+      return playerStats;
+    } catch (error) {
+      console.error(`Error fetching player stats for game ${gameId}:`, error);
       return null;
     }
-
-    const splits = data.splits;
-    const seasonStats = splits.find(split => split.displayName === 'Season') || { stats: [] };
-    const careerStats = splits.find(split => split.displayName === 'Career') || { stats: [] };
-    
-    return {
-      athleteId: data.athlete?.id,
-      name: data.athlete?.displayName || 'Unknown Player',
-      position: data.athlete?.position?.abbreviation || 'N/A',
-      team: data.athlete?.team?.displayName || 'Unknown Team',
-      seasonStats: this.formatPlayerStats(seasonStats.stats, league),
-      careerStats: this.formatPlayerStats(careerStats.stats, league)
-    };
-  }
-
-  // Format individual player statistics
-  formatPlayerStats(stats, league) {
-    if (!stats || !Array.isArray(stats)) {
-      return {};
-    }
-
-    const formattedStats = {};
-    
-    // Common football statistics mapping
-    const statMapping = {
-      'passingYards': ['passingYards', 'passYards', 'yards'],
-      'passingTDs': ['passingTDs', 'passTDs', 'touchdowns'],
-      'passingINTs': ['passingINTs', 'passINTs', 'interceptions'],
-      'rushingYards': ['rushingYards', 'rushYards', 'rushing'],
-      'rushingTDs': ['rushingTDs', 'rushTDs'],
-      'receivingYards': ['receivingYards', 'recYards', 'receiving'],
-      'receivingTDs': ['receivingTDs', 'recTDs'],
-      'receptions': ['receptions', 'rec'],
-      'tackles': ['tackles', 'totalTackles'],
-      'sacks': ['sacks', 'sack'],
-      'interceptions': ['interceptions', 'int', 'ints'],
-      'fumbles': ['fumbles', 'fumble'],
-      'fumblesRecovered': ['fumblesRecovered', 'fumbleRecoveries']
-    };
-
-    stats.forEach(stat => {
-      const label = stat.label?.toLowerCase();
-      const value = parseFloat(stat.value) || 0;
-      
-      // Map ESPN stat labels to our standardized format
-      for (const [ourKey, espnKeys] of Object.entries(statMapping)) {
-        if (espnKeys.some(key => label?.includes(key.toLowerCase()))) {
-          formattedStats[ourKey] = value;
-          break;
-        }
-      }
-    });
-
-    return formattedStats;
-  }
-
-  // Get game status from ESPN status
-  getGameStatus(espnStatus) {
-    const statusMap = {
-      'STATUS_FINAL': 'Final',
-      'STATUS_IN_PROGRESS': 'Live',
-      'STATUS_SCHEDULED': 'Scheduled',
-      'STATUS_POSTPONED': 'Postponed',
-      'STATUS_CANCELLED': 'Cancelled'
-    };
-    return statusMap[espnStatus] || 'Scheduled';
-  }
-
-  // Format game time
-  formatGameTime(dateString) {
-    if (!dateString) return 'TBD';
-    
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    });
-  }
-
-  // Format game date
-  formatGameDate(dateString) {
-    if (!dateString) return 'TBD';
-    
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  }
-
-  // Get week number
-  getWeekNumber(dateString, league) {
-    if (!dateString) return 'Week 1';
-    
-    const date = new Date(dateString);
-    const seasonStart = new Date(date.getFullYear(), 8, 1); // September 1st
-    const weekNumber = Math.ceil((date - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-    return `Week ${Math.max(1, weekNumber)}`;
-  }
-
-  // Mock data fallbacks
-  getMockNFLGames() {
-    return [
-      {
-        id: 1,
-        homeTeam: 'Kansas City Chiefs',
-        awayTeam: 'Buffalo Bills',
-        homeScore: 24,
-        awayScore: 17,
-        status: 'Final',
-        time: '4:25 PM ET',
-        date: 'Sun, Oct 15',
-        week: 'Week 6',
-        league: 'nfl'
-      },
-      {
-        id: 2,
-        homeTeam: 'Philadelphia Eagles',
-        awayTeam: 'Dallas Cowboys',
-        homeScore: 28,
-        awayScore: 23,
-        status: 'Final',
-        time: '8:20 PM ET',
-        date: 'Sun, Oct 15',
-        week: 'Week 6',
-        league: 'nfl'
-      },
-      {
-        id: 3,
-        homeTeam: 'Miami Dolphins',
-        awayTeam: 'New York Jets',
-        homeScore: 31,
-        awayScore: 21,
-        status: 'Final',
-        time: '1:00 PM ET',
-        date: 'Sun, Oct 15',
-        week: 'Week 6',
-        league: 'nfl'
-      }
-    ];
-  }
-
-  getMockNCAAGames() {
-    return [
-      {
-        id: 1,
-        homeTeam: 'Georgia Bulldogs',
-        awayTeam: 'Alabama Crimson Tide',
-        homeScore: 27,
-        awayScore: 24,
-        status: 'Final',
-        time: '3:30 PM ET',
-        date: 'Sat, Oct 14',
-        week: 'Week 7',
-        league: 'ncaa'
-      },
-      {
-        id: 2,
-        homeTeam: 'Ohio State Buckeyes',
-        awayTeam: 'Michigan Wolverines',
-        homeScore: 30,
-        awayScore: 27,
-        status: 'Final',
-        time: '12:00 PM ET',
-        date: 'Sat, Oct 14',
-        week: 'Week 7',
-        league: 'ncaa'
-      },
-      {
-        id: 3,
-        homeTeam: 'USC Trojans',
-        awayTeam: 'UCLA Bruins',
-        homeScore: 35,
-        awayScore: 28,
-        status: 'Final',
-        time: '7:30 PM ET',
-        date: 'Sat, Oct 14',
-        week: 'Week 7',
-        league: 'ncaa'
-      }
-    ];
   }
 }
 
+// Create and export a singleton instance
 const sportsApiService = new SportsApiService();
-export default sportsApiService;
+module.exports = sportsApiService;

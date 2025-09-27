@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Filter, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
@@ -8,7 +8,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activePage, setActivePage] = useState('schedule');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -25,20 +24,8 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     }
   }, [isDarkMode]);
 
-  // Load initial games
-  useEffect(() => {
-    loadGames();
-  }, [activeLeague]);
-
-  // Reload games when team selection changes
-  useEffect(() => {
-    if (availableTeams.length > 0) {
-      loadGames();
-    }
-  }, [selectedTeam]);
-
   // Load games function
-  const loadGames = async () => {
+  const loadGames = useCallback(async () => {
     setLoading(true);
     try {
       // Get comprehensive game data from API
@@ -77,30 +64,19 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeLeague, selectedTeam]);
 
+  // Load initial games
+  useEffect(() => {
+    loadGames();
+  }, [activeLeague, loadGames]);
 
-  // Generate past date for mock data
-  const getPastDate = (weeksAgo) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (weeksAgo * 7));
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Generate future date for mock data
-  const getFutureDate = (weeksAhead) => {
-    const date = new Date();
-    date.setDate(date.getDate() + (weeksAhead * 7));
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  // Reload games when team selection changes
+  useEffect(() => {
+    if (availableTeams.length > 0) {
+      loadGames();
+    }
+  }, [selectedTeam, loadGames, availableTeams.length]);
 
   // Generate comprehensive season schedule for a specific team
   const generateComprehensiveTeamSchedule = (teamName, allGamesData, league) => {
@@ -124,7 +100,7 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
       
       const isPastWeek = week < 9;
       const isCurrentWeek = week === 9;
-      const isFutureWeek = week > 9;
+      // const isFutureWeek = week > 9; // Unused variable
       
       // Select opponent (cycle through teams)
       const opponent = teamList[(week - 1) % teamList.length];
@@ -283,13 +259,13 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     return game ? game.league : activeLeague;
   };
 
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
+  // Handle suggestion click - disabled to reduce API calls
+  // const handleSuggestionClick = (teamName) => {
+  //   setSearchQuery(teamName);
+  //   setShowSuggestions(false);
+  //   const league = findTeamLeague(teamName);
+  //   navigate('/team', { state: { team: { name: teamName, league } } });
+  // };
 
   // Handle search form submit
   const handleSearch = (e) => {
@@ -417,22 +393,13 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                   </button>
                 </form>
 
-                {/* Search Suggestions Dropdown */}
-                {showSuggestions && searchSuggestions.length > 0 && (
+                {/* Search Suggestions Dropdown - Disabled to reduce API calls */}
+                {false && showSuggestions && (
                   <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
                     <div className="py-1">
-                      {searchSuggestions.map((team, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleSuggestionClick(team)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <Search className="w-4 h-4 text-gray-400" />
-                            <span>{team}</span>
-                          </div>
-                        </button>
-                      ))}
+                      <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        Search suggestions disabled to reduce API calls
+                      </div>
                     </div>
                   </div>
                 )}

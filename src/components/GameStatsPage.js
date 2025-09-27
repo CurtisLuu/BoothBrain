@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
@@ -16,14 +16,10 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
   }, [selectedGame]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPlayerStatistics = async () => {
-    console.log('🎯 AllStatisticsSection: loadPlayerStatistics called');
     setLoading(true);
     setError(null);
     
     try {
-      console.log('📊 Loading player statistics for game:', selectedGame.id);
-      console.log('🎮 Game details:', selectedGame);
-      
       // Try to get real game summary from ESPN API
       let gameSummary = null;
       let realPlayerStats = [];
@@ -31,37 +27,25 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
       // Check if we have a valid event ID for ESPN API
       if (selectedGame.id && selectedGame.league) {
         try {
-          console.log(`🔍 Attempting to fetch game summary for event ${selectedGame.id} (${selectedGame.league})`);
           gameSummary = await footballApi.getGameSummary(selectedGame.id, selectedGame.league);
-          console.log('📈 Game summary from API:', gameSummary);
           
           if (gameSummary && gameSummary.players) {
             realPlayerStats = gameSummary.players;
-            console.log('✅ Real player stats found:', realPlayerStats.length);
-            console.log('👥 Sample real players:', realPlayerStats.slice(0, 3));
-          } else {
-            console.log('⚠️ No players found in game summary');
           }
         } catch (apiError) {
-          console.warn('❌ API call failed, falling back to mock data:', apiError);
+          // API call failed, will fall back to mock data
         }
-      } else {
-        console.log('⚠️ Missing game ID or league, using mock data');
       }
       
       // If we got real data, use it; otherwise fall back to mock data
       if (realPlayerStats.length > 0) {
-        console.log('🎉 Using real player statistics from API');
         setPlayerStats(realPlayerStats);
       } else {
-        console.log('🎭 Using mock player statistics as fallback');
         const mockPlayerStats = generateMockPlayerStats(selectedGame);
-        console.log('🎭 Generated mock players:', mockPlayerStats.length);
         setPlayerStats(mockPlayerStats);
       }
       
     } catch (err) {
-      console.error('💥 Error loading player statistics:', err);
       setError('Failed to load player statistics');
       
       // Even if there's an error, try to show mock data as fallback
@@ -69,19 +53,17 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
         const mockPlayerStats = generateMockPlayerStats(selectedGame);
         setPlayerStats(mockPlayerStats);
         setError(null); // Clear error since we have fallback data
-        console.log('🆘 Fallback mock data generated successfully');
       } catch (mockError) {
-        console.error('💀 Even mock data generation failed:', mockError);
+        // Even mock data generation failed
       }
     } finally {
       setLoading(false);
-      console.log('🏁 AllStatisticsSection: loadPlayerStatistics finished');
     }
   };
 
   const generateMockPlayerStats = (game) => {
     const positions = ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'CB', 'S', 'K', 'P'];
-    const teams = [game.awayTeam, game.homeTeam];
+    const teams = [game.awayTeam || 'Away Team', game.homeTeam || 'Home Team'];
     const players = [];
 
     teams.forEach(team => {
@@ -404,53 +386,143 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   });
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [lastSidebarRefreshTime, setLastSidebarRefreshTime] = useState(null);
 
   // Get game from location state or use default
   const gameFromState = location.state?.game;
 
-  useEffect(() => {
-    // Only load games if sidebar is not collapsed
-    if (!sidebarCollapsed) {
-      loadAllGames();
+  // Load individual team stats
+  const loadTeamStats = useCallback(async (teamName, league) => {
+    try {
+      console.log('📈 Loading stats for team:', teamName);
+      
+      // Get team's season statistics
+      const teamStats = await footballApi.getTeamStats(teamName, league);
+      console.log('📊 Team stats for', teamName, ':', teamStats);
+      
+      return teamStats;
+      
+    } catch (error) {
+      console.error('❌ Error loading team stats for', teamName, ':', error);
+      return null;
+    }
+  }, []);
+
+  // Load team season stats for both teams
+  const loadTeamSeasonStats = useCallback(async (game) => {
+    try {
+      console.log('🏈 Loading season stats for teams:', game.awayTeam || 'Away Team', 'and', game.homeTeam || 'Home Team');
+      
+      const [awayTeamStats, homeTeamStats] = await Promise.all([
+        loadTeamStats(game.awayTeam || 'Away Team', game.league),
+        loadTeamStats(game.homeTeam || 'Home Team', game.league)
+      ]);
+      
+      return {
+        awayTeam: {
+          name: game.awayTeam || 'Away Team',
+          stats: awayTeamStats
+        },
+        homeTeam: {
+          name: game.homeTeam || 'Home Team',
+          stats: homeTeamStats
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ Error loading team season stats:', error);
+      return null;
+    }
+  }, [loadTeamStats]);
+
+  // Load game data with rate limiting
+  const loadGameData = useCallback(async (game) => {
+    if (!game || !game.id) {
+      // No game or game ID provided for data loading
+      return;
+    }
+
+    // Starting loadGameData for game
+
+    setGameDataLoading(true);
+    try {
+      // Loading comprehensive game data
+      
+      // Load data sources with delays to avoid rate limiting
+      // Start with game summary (most important)
+      const gameSummary = await footballApi.getGameSummary(game.id, game.league);
+      
+      // Add delay between requests
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get boxscore (may fail due to CORS, that's okay)
+      const gameBoxscore = await footballApi.getGameBoxscore(game.id, game.league);
+      
+      // Add delay between requests
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get game details (may also fail)
+      const gameDetails = await footballApi.getGameDetails(game.id, game.league);
+      
+      // Add delay between requests
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get team season stats (may fail)
+      const teamStats = await loadTeamSeasonStats(game);
+      
+      
+      const checkForRefObjects = (obj, path = '') => {
+        if (obj && typeof obj === 'object') {
+          if (obj.$ref) {
+            // Found $ref object
+          }
+          Object.keys(obj).forEach(key => {
+            checkForRefObjects(obj[key], `${path}.${key}`);
+          });
+        }
+      };
+
+      // Debug: Check for $ref objects in the data
+      checkForRefObjects(gameSummary, 'gameSummary');
+      checkForRefObjects(gameBoxscore, 'gameBoxscore');
+      checkForRefObjects(gameDetails, 'gameDetails');
+      checkForRefObjects(teamStats, 'teamStats');
+      
+      const combinedStats = {
+        gameSummary: gameSummary,
+        gameBoxscore: gameBoxscore,
+        gameDetails: gameDetails,
+        teamStats: teamStats,
+        players: gameBoxscore?.players || gameSummary?.players || []
+      };
+      
+      setApiDetailedStats(combinedStats);
+      // Comprehensive game data loaded
+      
+    } catch (error) {
+      // Error loading game data
+      setApiDetailedStats(null);
+    } finally {
+      // Finished loadGameData
+      setGameDataLoading(false);
+    }
+  }, [loadTeamSeasonStats]);
+
+  const loadAllGames = useCallback(async () => {
+    // Limit sidebar refresh to once every 10 minutes to reduce API calls
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
+    
+    if (lastSidebarRefreshTime && (now - lastSidebarRefreshTime) < tenMinutes) {
+      // Don't refresh if less than 10 minutes have passed
+      return;
     }
     
-    if (gameFromState) {
-      setSelectedGame(gameFromState);
-      // Save the selected game to localStorage
-      localStorage.setItem('selectedGame', JSON.stringify(gameFromState));
-      // Trigger API calls for the game from state
-      loadGameData(gameFromState);
-    } else {
-      // Try to restore the previously selected game from localStorage
-      const savedGame = localStorage.getItem('selectedGame');
-      if (savedGame) {
-        try {
-          const parsedGame = JSON.parse(savedGame);
-          setSelectedGame(parsedGame);
-          // Trigger API calls for the saved game
-          loadGameData(parsedGame);
-        } catch (error) {
-          console.error('Error parsing saved game:', error);
-          localStorage.removeItem('selectedGame');
-        }
-      }
-    }
-  }, [gameFromState, sidebarCollapsed]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Apply dark mode class to document
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-
-  const loadAllGames = async () => {
     setLoading(true);
     try {
-      console.log('Loading all games...');
+      // Loading all games
       
       const [
         nflGames, 
@@ -468,14 +540,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
         footballApi.getNextWeekNCAAGames()
       ]);
       
-      console.log('Games loaded:', {
-        nflGames: nflGames.length,
-        ncaaGames: ncaaGames.length,
-        previousNFLGames: previousNFLGames.length,
-        previousNCAAGames: previousNCAAGames.length,
-        nextNFLGames: nextNFLGames.length,
-        nextNCAAGames: nextNCAAGames.length
-      });
       
       // Organize current week games
       const currentWeekCombined = [
@@ -532,8 +596,48 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.error('Error loading games:', error);
     } finally {
       setLoading(false);
+      // Update the last refresh time only on successful completion
+      setLastSidebarRefreshTime(Date.now());
     }
-  };
+  }, [lastSidebarRefreshTime, gameFromState, loadGameData]);
+
+  useEffect(() => {
+    // Only load games if sidebar is not collapsed
+    if (!sidebarCollapsed) {
+      loadAllGames();
+    }
+    
+    if (gameFromState) {
+      setSelectedGame(gameFromState);
+      // Save the selected game to localStorage
+      localStorage.setItem('selectedGame', JSON.stringify(gameFromState));
+      // Trigger API calls for the game from state
+      loadGameData(gameFromState);
+    } else {
+      // Try to restore the previously selected game from localStorage
+      const savedGame = localStorage.getItem('selectedGame');
+      if (savedGame) {
+        try {
+          const parsedGame = JSON.parse(savedGame);
+          setSelectedGame(parsedGame);
+          // Trigger API calls for the saved game
+          loadGameData(parsedGame);
+        } catch (error) {
+          // Error parsing saved game
+          localStorage.removeItem('selectedGame');
+        }
+      }
+    }
+  }, [gameFromState, sidebarCollapsed, loadAllGames, loadGameData]);
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // Search functionality
   const generateSuggestions = (query) => {
@@ -546,10 +650,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     const teamNames = new Set();
     
     allGames.forEach(game => {
-      if (game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
+      if (game.homeTeam && game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
         teamNames.add(game.homeTeam);
       }
-      if (game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
+      if (game.awayTeam && game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
         teamNames.add(game.awayTeam);
       }
     });
@@ -567,8 +671,8 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
 
   const findTeamLeague = (teamName) => {
     const game = allGames.find(game => 
-      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
+      (game.homeTeam && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())) ||
+      (game.awayTeam && game.awayTeam.toLowerCase().includes(teamName.toLowerCase()))
     );
     return game ? game.league : 'nfl';
   };
@@ -604,7 +708,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   };
 
   const handleGameSelect = (game) => {
-    console.log('Game selected:', game);
+    // Game selected
     setSelectedGame(game);
     // Save the selected game to localStorage
     localStorage.setItem('selectedGame', JSON.stringify(game));
@@ -620,20 +724,23 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     // Save to localStorage
     localStorage.setItem('sidebarCollapsed', JSON.stringify(newCollapsedState));
     
-    console.log(`📱 Sidebar ${newCollapsedState ? 'collapsed' : 'expanded'}`);
+    // Sidebar state changed
     
     // If expanding, load games
     if (!newCollapsedState) {
-      console.log('🔄 Loading games because sidebar was expanded');
+      // Loading games because sidebar was expanded
       loadAllGames();
     } else {
-      console.log('💾 Sidebar collapsed - games will not be loaded until expanded');
+      // Sidebar collapsed - games will not be loaded until expanded
     }
   };
 
   // Helper function to safely extract values from ESPN API responses
   const safeExtractValue = (obj, path, fallback = '0') => {
     try {
+      if (!path || typeof path !== 'string') {
+        return fallback;
+      }
       const keys = path.split('.');
       let current = obj;
       for (const key of keys) {
@@ -665,137 +772,35 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     return String(value);
   };
 
-  // Function to load comprehensive data for a selected game
-  const loadGameData = async (game) => {
-    if (!game || !game.id) {
-      console.log('No game or game ID provided for data loading');
-      return;
-    }
-
-    console.log('🚀 Starting loadGameData for game:', {
-      id: game.id,
-      league: game.league,
-      awayTeam: game.awayTeam,
-      homeTeam: game.homeTeam
-    });
-
-    setGameDataLoading(true);
-    try {
-      console.log('📡 Loading comprehensive game data...');
-      
-      // Load multiple data sources in parallel
-      const [gameSummary, gameBoxscore, gameDetails, teamStats] = await Promise.all([
-        // Get game summary with player stats
-        footballApi.getGameSummary(game.id, game.league),
-        // Get comprehensive game boxscore with all player statistics
-        footballApi.getGameBoxscore(game.id, game.league),
-        // Get detailed game data from ESPN Core API
-        footballApi.getGameDetails(game.id, game.league),
-        // Get team season stats
-        loadTeamSeasonStats(game)
-      ]);
-      
-      console.log('📊 Game summary:', gameSummary);
-      console.log('📋 Game boxscore:', gameBoxscore);
-      console.log('🎮 Game details:', gameDetails);
-      console.log('🏈 Team season stats:', teamStats);
-      
-      // Debug: Check for $ref objects in the data
-      const checkForRefObjects = (obj, path = '') => {
-        if (obj && typeof obj === 'object') {
-          if (obj.$ref) {
-            console.warn(`⚠️ Found $ref object at ${path}:`, obj);
-          }
-          Object.keys(obj).forEach(key => {
-            checkForRefObjects(obj[key], `${path}.${key}`);
-          });
-        }
-      };
-      
-      checkForRefObjects(gameSummary, 'gameSummary');
-      checkForRefObjects(gameBoxscore, 'gameBoxscore');
-      checkForRefObjects(gameDetails, 'gameDetails');
-      checkForRefObjects(teamStats, 'teamStats');
-      
-      // Combine all data sources - prioritize boxscore for player data
-      const combinedStats = {
-        gameId: game.id,
-        gameInfo: game,
-        gameSummary: gameSummary,
-        gameBoxscore: gameBoxscore,
-        gameDetails: gameDetails,
-        teamStats: teamStats,
-        players: gameBoxscore?.players || gameSummary?.players || []
-      };
-      
-      setApiDetailedStats(combinedStats);
-      console.log('✅ Comprehensive game data loaded:', combinedStats);
-      
-    } catch (error) {
-      console.error('❌ Error loading game data:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack
-      });
-      setApiDetailedStats(null);
-    } finally {
-      console.log('🏁 Finished loadGameData');
-      setGameDataLoading(false);
-    }
-  };
-
-
-  // Load team season stats for both teams
-  const loadTeamSeasonStats = async (game) => {
-    try {
-      console.log('🏈 Loading season stats for teams:', game.awayTeam, 'and', game.homeTeam);
-      
-      const [awayTeamStats, homeTeamStats] = await Promise.all([
-        loadTeamStats(game.awayTeam, game.league),
-        loadTeamStats(game.homeTeam, game.league)
-      ]);
-      
-      return {
-        awayTeam: {
-          name: game.awayTeam,
-          stats: awayTeamStats
-        },
-        homeTeam: {
-          name: game.homeTeam,
-          stats: homeTeamStats
-        }
-      };
-      
-    } catch (error) {
-      console.error('❌ Error loading team season stats:', error);
-      return null;
-    }
-  };
-
-  // Load individual team stats
-  const loadTeamStats = async (teamName, league) => {
-    try {
-      console.log('📈 Loading stats for team:', teamName);
-      
-      // Get team's season statistics
-      const teamStats = await footballApi.getTeamStats(teamName, league);
-      console.log('📊 Team stats for', teamName, ':', teamStats);
-      
-      return teamStats;
-      
-    } catch (error) {
-      console.error('❌ Error loading team stats for', teamName, ':', error);
-      return null;
-    }
-  };
-
   // Effect to load game data when selectedGame changes
   useEffect(() => {
     if (selectedGame && selectedGame.id) {
-      console.log('Selected game changed, loading data for:', selectedGame.id);
       loadGameData(selectedGame);
+      setLastRefreshTime(new Date());
     }
-  }, [selectedGame]);
+  }, [selectedGame, loadGameData]);
+
+  // Auto-refresh timer (every 5 minutes)
+  useEffect(() => {
+    if (!autoRefreshEnabled || !selectedGame) return;
+
+    const interval = setInterval(() => {
+      if (selectedGame && selectedGame.id) {
+        loadGameData(selectedGame);
+        setLastRefreshTime(new Date());
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, selectedGame, loadGameData]);
+
+  // Manual refresh function
+  const handleManualRefresh = useCallback(() => {
+    if (selectedGame && selectedGame.id) {
+      loadGameData(selectedGame);
+      setLastRefreshTime(new Date());
+    }
+  }, [selectedGame, loadGameData]);
 
 
   const getLeagueColor = (league) => {
@@ -1153,7 +1158,9 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                     {(() => {
                       const filteredGames = filterGamesBySearch(allGames.filter(game => game.league === activeLeague));
                       const displayedGames = getBiggestGames(filteredGames);
-                      return searchTerm ? `${displayedGames.length} of ${filteredGames.length} games` : `${displayedGames.length} games`;
+                      const gameCount = searchTerm ? `${displayedGames.length} of ${filteredGames.length} games` : `${displayedGames.length} games`;
+                      const refreshInfo = lastSidebarRefreshTime ? ` • Updated ${new Date(lastSidebarRefreshTime).toLocaleTimeString()}` : '';
+                      return gameCount + refreshInfo;
                     })()}
                   </div>
                 </>
@@ -1234,18 +1241,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </button>
                 )}
               </div>
-              {/* Test button for debugging */}
-              {activeLeague === 'ncaa' && (
-                <button
-                  onClick={() => {
-                    console.log('Test search clicked');
-                    handleNCAASearch('alabama');
-                  }}
-                  className="mt-2 text-xs bg-blue-500 text-white px-2 py-1 rounded"
-                >
-                  Test Search "alabama"
-                </button>
-              )}
             </div>
 
             {/* Search Results for NCAA */}
@@ -1270,7 +1265,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                             }}
                             className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                           >
-                            {game.awayTeam}
+                            {game.awayTeam || 'Away Team'}
                           </button>
                           {' @ '}
                           <button
@@ -1280,7 +1275,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                             }}
                             className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                           >
-                            {game.homeTeam}
+                            {game.homeTeam || 'Home Team'}
                           </button>
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -1368,10 +1363,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.awayTeam.split(' ').slice(-1)[0]}
+                                    {game.awayTeam ? game.awayTeam.split(' ').slice(-1)[0] : 'Away'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.awayScore}
+                                    {game.awayScore || '0'}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -1382,10 +1377,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.homeTeam.split(' ').slice(-1)[0]}
+                                    {game.homeTeam ? game.homeTeam.split(' ').slice(-1)[0] : 'Home'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.homeScore}
+                                    {game.homeScore || '0'}
                                   </span>
                                 </div>
                               </div>
@@ -1467,10 +1462,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.awayTeam.split(' ').slice(-1)[0]}
+                                    {game.awayTeam ? game.awayTeam.split(' ').slice(-1)[0] : 'Away'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.awayScore}
+                                    {game.awayScore || '0'}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -1481,10 +1476,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.homeTeam.split(' ').slice(-1)[0]}
+                                    {game.homeTeam ? game.homeTeam.split(' ').slice(-1)[0] : 'Home'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.homeScore}
+                                    {game.homeScore || '0'}
                                   </span>
                                 </div>
                               </div>
@@ -1561,10 +1556,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.awayTeam.split(' ').slice(-1)[0]}
+                                    {game.awayTeam ? game.awayTeam.split(' ').slice(-1)[0] : 'Away'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.awayScore}
+                                    {game.awayScore || '0'}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -1575,10 +1570,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                     }}
                                     className="text-xs font-medium text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                                   >
-                                    {game.homeTeam.split(' ').slice(-1)[0]}
+                                    {game.homeTeam ? game.homeTeam.split(' ').slice(-1)[0] : 'Home'}
                                   </button>
                                   <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                    {game.homeScore}
+                                    {game.homeScore || '0'}
                                   </span>
                                 </div>
                               </div>
@@ -1652,14 +1647,12 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                 </div>
                               )}
                               <button
-                                onClick={() => {
-                                  console.log('🧪 Manual API test triggered');
-                                  console.log('Selected game for testing:', selectedGame);
-                                  loadGameData(selectedGame);
-                                }}
-                                className="ml-3 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                onClick={handleManualRefresh}
+                                disabled={gameDataLoading}
+                                className="ml-3 px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
                               >
-                                Debug API
+                                <Clock className="w-3 h-3" />
+                                <span>Refresh</span>
                               </button>
                             </h2>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
@@ -1678,6 +1671,21 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               }`}>
                                 {selectedGame.status}
                               </span>
+                              {lastRefreshTime && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  • Last updated: {lastRefreshTime.toLocaleTimeString()}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                                className={`px-2 py-1 text-xs rounded transition-colors ${
+                                  autoRefreshEnabled
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                }`}
+                              >
+                                Auto-refresh: {autoRefreshEnabled ? 'ON' : 'OFF'}
+                              </button>
                             </div>
                           </div>
                           <div className="text-right">
@@ -1708,25 +1716,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </div>
                 )}
 
-                {/* Debug Section */}
-                {apiDetailedStats && (
-                  <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg mb-4">
-                    <h4 className="font-bold mb-2">Debug: API Data Structure</h4>
-                    <div className="text-xs space-y-1">
-                      <div>Game Summary: {apiDetailedStats.gameSummary ? '✅' : '❌'}</div>
-                      <div>Game Boxscore: {apiDetailedStats.gameBoxscore ? '✅' : '❌'}</div>
-                      <div>Game Details: {apiDetailedStats.gameDetails ? '✅' : '❌'}</div>
-                      <div>Team Stats: {apiDetailedStats.teamStats ? '✅' : '❌'}</div>
-                      <div>Players: {apiDetailedStats.players?.length || 0}</div>
-                    </div>
-                    <button
-                      onClick={() => console.log('Full API Data:', apiDetailedStats)}
-                      className="text-blue-500 text-xs mt-2"
-                    >
-                      Log Full Data to Console
-                    </button>
-                  </div>
-                )}
 
                 {/* Game Statistics Section */}
                 <div className="mb-8">

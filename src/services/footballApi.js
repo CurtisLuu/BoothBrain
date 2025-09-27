@@ -1,5 +1,5 @@
 // Football API service using real sports APIs
-import sportsApiService from './sportsApi';
+const sportsApiService = require('./sportsApi');
 
 class FootballApiService {
   // No constructor needed - using static methods
@@ -281,6 +281,19 @@ class FootballApiService {
     } catch (error) {
       console.error(`Error fetching NCAA games for week ${week}:`, error);
       return [];
+    }
+  }
+
+  // Get player statistics from game data
+  async getPlayerStats(gameId, league) {
+    try {
+      console.log(`Fetching player stats for game ${gameId} in ${league}...`);
+      const stats = await sportsApiService.getPlayerStats(gameId, league);
+      console.log(`Player stats for game ${gameId} fetched:`, stats);
+      return stats;
+    } catch (error) {
+      console.error(`Error fetching player stats for game ${gameId}:`, error);
+      return null;
     }
   }
 }
