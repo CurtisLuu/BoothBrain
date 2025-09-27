@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar } from 'lucide-react';
+import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar, Upload } from 'lucide-react';
 import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
+import ImportPage from './components/ImportPage';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
 
@@ -184,6 +185,11 @@ function Dashboard({ activeTab, setActiveTab }) {
     navigate('/schedule');
   };
 
+  const navigateToImport = () => {
+    setActivePage('import');
+    navigate('/import');
+  };
+
   const navigateToHome = () => {
     setActivePage('home');
     // Clear the saved game when navigating to home page
@@ -260,6 +266,17 @@ function Dashboard({ activeTab, setActiveTab }) {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
+                </button>
+                <button
+                  onClick={navigateToImport}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'import' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Import</span>
                 </button>
               </div>
 
@@ -488,6 +505,7 @@ function App() {
           <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
           <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
           <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+          <Route path="/import" element={<ImportPage />} />
           <Route path="/team" element={<TeamPage />} />
         </Routes>
       </Router>

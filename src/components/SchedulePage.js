@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Filter, ChevronDown } from 'lucide-react';
+import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Filter, ChevronDown, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
@@ -310,6 +310,11 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     navigate('/schedule');
   };
 
+  const navigateToImport = () => {
+    setActivePage('import');
+    navigate('/import');
+  };
+
   // Handle game click
   const handleGameClick = (game) => {
     navigate('/stats', { state: { game } });
@@ -370,6 +375,17 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
+                </button>
+                <button
+                  onClick={navigateToImport}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'import' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Import</span>
                 </button>
               </div>
 

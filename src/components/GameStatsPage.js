@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar } from 'lucide-react';
+import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Upload, Download } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { generateGameStatsHTMLPDF } from '../utils/pdfGenerator';
 
 // All Statistics Section Component
 const AllStatisticsSection = ({ selectedGame, teamStats }) => {
@@ -596,6 +597,11 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     navigate('/schedule');
   };
 
+  const navigateToImport = () => {
+    setActivePage('import');
+    navigate('/import');
+  };
+
   const handleGameSelect = (game) => {
     console.log('Game selected:', game);
     setSelectedGame(game);
@@ -1071,6 +1077,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
                 </button>
+                <button
+                  onClick={navigateToImport}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'import' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Import</span>
+                </button>
               </div>
 
               {/* Search Bar */}
@@ -1116,6 +1133,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </div>
                 )}
               </div>
+
               
               {/* Dark Mode Toggle */}
               <button
@@ -1227,18 +1245,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </button>
                 )}
               </div>
-              {/* Test button for debugging */}
-              {activeLeague === 'ncaa' && (
-                <button
-                  onClick={() => {
-                    console.log('Test search clicked');
-                    handleNCAASearch('alabama');
-                  }}
-                  className="mt-2 text-xs bg-blue-500 text-white px-2 py-1 rounded"
-                >
-                  Test Search "alabama"
-                </button>
-              )}
             </div>
 
             {/* Search Results for NCAA */}
@@ -1644,16 +1650,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                   <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading data...</span>
                                 </div>
                               )}
-                              <button
-                                onClick={() => {
-                                  console.log('🧪 Manual API test triggered');
-                                  console.log('Selected game for testing:', selectedGame);
-                                  loadGameData(selectedGame);
-                                }}
-                                className="ml-3 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                              >
-                                Debug API
-                              </button>
                             </h2>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
                               <span>{selectedGame.week}</span>
@@ -1673,16 +1669,29 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               </span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                              {selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game' 
-                                ? '0 - 0' 
-                                : `${selectedGame.awayScore} - ${selectedGame.homeScore}`
-                              }
+                          <div className="text-right flex items-center space-x-4">
+                            <div>
+                              <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                                {selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game' 
+                                  ? '0 - 0' 
+                                  : `${selectedGame.awayScore} - ${selectedGame.homeScore}`
+                                }
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-300">
+                                {getLeagueText(selectedGame.league)}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-300">
-                              {getLeagueText(selectedGame.league)}
-                            </div>
+                            <button
+                              onClick={() => {
+                                // Export as PDF using HTML-based PDF generation
+                                generateGameStatsHTMLPDF(selectedGame, detailedStats);
+                              }}
+                              className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              title="Export game statistics as PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span className="hidden sm:inline">Export PDF</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1701,25 +1710,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   </div>
                 )}
 
-                {/* Debug Section */}
-                {apiDetailedStats && (
-                  <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg mb-4">
-                    <h4 className="font-bold mb-2">Debug: API Data Structure</h4>
-                    <div className="text-xs space-y-1">
-                      <div>Game Summary: {apiDetailedStats.gameSummary ? '✅' : '❌'}</div>
-                      <div>Game Boxscore: {apiDetailedStats.gameBoxscore ? '✅' : '❌'}</div>
-                      <div>Game Details: {apiDetailedStats.gameDetails ? '✅' : '❌'}</div>
-                      <div>Team Stats: {apiDetailedStats.teamStats ? '✅' : '❌'}</div>
-                      <div>Players: {apiDetailedStats.players?.length || 0}</div>
-                    </div>
-                    <button
-                      onClick={() => console.log('Full API Data:', apiDetailedStats)}
-                      className="text-blue-500 text-xs mt-2"
-                    >
-                      Log Full Data to Console
-                    </button>
-                  </div>
-                )}
 
                 {/* Game Statistics Section */}
                 <div className="mb-8">
