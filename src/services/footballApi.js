@@ -206,6 +206,45 @@ class FootballApiService {
     }
   }
 
+  // Get team statistics for a specific team
+  async getTeamStats(teamName, league) {
+    try {
+      console.log(`Fetching team stats for ${teamName} in ${league}...`);
+      const teamStats = await sportsApiService.getTeamStats(teamName, league);
+      console.log(`Team stats for ${teamName} fetched:`, teamStats);
+      return teamStats;
+    } catch (error) {
+      console.error(`Error fetching team stats for ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Get detailed game data using ESPN's core API
+  async getGameDetails(gameId, league) {
+    try {
+      console.log(`Fetching detailed game data for ${gameId} in ${league}...`);
+      const gameDetails = await sportsApiService.getGameDetails(gameId, league);
+      console.log(`Game details for ${gameId} fetched:`, gameDetails);
+      return gameDetails;
+    } catch (error) {
+      console.error(`Error fetching game details for ${gameId}:`, error);
+      return null;
+    }
+  }
+
+  // Get team statistics using ESPN's core API
+  async getTeamStatistics(teamId, league) {
+    try {
+      console.log(`Fetching team statistics for ${teamId} in ${league}...`);
+      const teamStats = await sportsApiService.getTeamStatistics(teamId, league);
+      console.log(`Team statistics for ${teamId} fetched:`, teamStats);
+      return teamStats;
+    } catch (error) {
+      console.error(`Error fetching team statistics for ${teamId}:`, error);
+      return null;
+    }
+  }
+
   // Get NCAA games by specific week
   async getNCAAGamesByWeek(week) {
     try {

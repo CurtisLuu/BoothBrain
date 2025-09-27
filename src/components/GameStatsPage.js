@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 
 // All Statistics Section Component
-const AllStatisticsSection = ({ selectedGame }) => {
+const AllStatisticsSection = ({ selectedGame, teamStats }) => {
   const [playerStats, setPlayerStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,25 +16,66 @@ const AllStatisticsSection = ({ selectedGame }) => {
   }, [selectedGame]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPlayerStatistics = async () => {
+    console.log('🎯 AllStatisticsSection: loadPlayerStatistics called');
     setLoading(true);
     setError(null);
     
     try {
-      console.log('Loading player statistics for game:', selectedGame.id);
+      console.log('📊 Loading player statistics for game:', selectedGame.id);
+      console.log('🎮 Game details:', selectedGame);
       
-      // For now, we'll use mock data since ESPN API requires specific event IDs
-      // In a real implementation, you would call:
-      // const gameSummary = await footballApi.getGameSummary(selectedGame.id, selectedGame.league);
+      // Try to get real game summary from ESPN API
+      let gameSummary = null;
+      let realPlayerStats = [];
       
-      // Mock comprehensive player statistics
-      const mockPlayerStats = generateMockPlayerStats(selectedGame);
-      setPlayerStats(mockPlayerStats);
+      // Check if we have a valid event ID for ESPN API
+      if (selectedGame.id && selectedGame.league) {
+        try {
+          console.log(`🔍 Attempting to fetch game summary for event ${selectedGame.id} (${selectedGame.league})`);
+          gameSummary = await footballApi.getGameSummary(selectedGame.id, selectedGame.league);
+          console.log('📈 Game summary from API:', gameSummary);
+          
+          if (gameSummary && gameSummary.players) {
+            realPlayerStats = gameSummary.players;
+            console.log('✅ Real player stats found:', realPlayerStats.length);
+            console.log('👥 Sample real players:', realPlayerStats.slice(0, 3));
+          } else {
+            console.log('⚠️ No players found in game summary');
+          }
+        } catch (apiError) {
+          console.warn('❌ API call failed, falling back to mock data:', apiError);
+        }
+      } else {
+        console.log('⚠️ Missing game ID or league, using mock data');
+      }
+      
+      // If we got real data, use it; otherwise fall back to mock data
+      if (realPlayerStats.length > 0) {
+        console.log('🎉 Using real player statistics from API');
+        setPlayerStats(realPlayerStats);
+      } else {
+        console.log('🎭 Using mock player statistics as fallback');
+        const mockPlayerStats = generateMockPlayerStats(selectedGame);
+        console.log('🎭 Generated mock players:', mockPlayerStats.length);
+        setPlayerStats(mockPlayerStats);
+      }
       
     } catch (err) {
-      console.error('Error loading player statistics:', err);
+      console.error('💥 Error loading player statistics:', err);
       setError('Failed to load player statistics');
+      
+      // Even if there's an error, try to show mock data as fallback
+      try {
+        const mockPlayerStats = generateMockPlayerStats(selectedGame);
+        setPlayerStats(mockPlayerStats);
+        setError(null); // Clear error since we have fallback data
+        console.log('🆘 Fallback mock data generated successfully');
+      } catch (mockError) {
+        console.error('💀 Even mock data generation failed:', mockError);
+      }
     } finally {
       setLoading(false);
+      console.log('🏁 AllStatisticsSection: loadPlayerStatistics finished');
     }
   };
 
@@ -184,8 +225,16 @@ const AllStatisticsSection = ({ selectedGame }) => {
     <div className="space-y-6">
       {/* Team Statistics Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TeamStatsOverview team={selectedGame.awayTeam} players={awayTeamPlayers} />
-        <TeamStatsOverview team={selectedGame.homeTeam} players={homeTeamPlayers} />
+        <TeamStatsOverview 
+          team={selectedGame.awayTeam} 
+          players={awayTeamPlayers} 
+          teamStats={teamStats?.awayTeam?.stats}
+        />
+        <TeamStatsOverview 
+          team={selectedGame.homeTeam} 
+          players={homeTeamPlayers} 
+          teamStats={teamStats?.homeTeam?.stats}
+        />
       </div>
 
       {/* Detailed Player Statistics */}
@@ -224,9 +273,17 @@ const AllStatisticsSection = ({ selectedGame }) => {
 };
 
 // Team Statistics Overview Component
-const TeamStatsOverview = ({ team, players }) => {
-  const totalStats = players.reduce((acc, player) => {
-    Object.keys(player.seasonStats).forEach(stat => {
+const TeamStatsOverview = ({ team, players, teamStats }) => {
+  // Use API team stats if available, otherwise calculate from players
+  const totalStats = teamStats?.stats ? {
+    passingYards: teamStats.stats.offense?.passingYards || 0,
+    rushingYards: teamStats.stats.offense?.rushingYards || 0,
+    receivingYards: teamStats.stats.offense?.receivingYards || 0,
+    totalTouchdowns: teamStats.stats.offense?.totalTouchdowns || 0,
+    totalTackles: teamStats.stats.defense?.totalTackles || 0,
+    totalSacks: teamStats.stats.defense?.totalSacks || 0
+  } : players.reduce((acc, player) => {
+    Object.keys(player.seasonStats || {}).forEach(stat => {
       acc[stat] = (acc[stat] || 0) + (player.seasonStats[stat] || 0);
     });
     return acc;
@@ -328,12 +385,14 @@ const PlayerCard = ({ player }) => {
   );
 };
 
-const GameStatsPage = ({ activeLeague }) => {
+const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedGame, setSelectedGame] = useState(null);
   const [allGames, setAllGames] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [gameDataLoading, setGameDataLoading] = useState(false);
+  const [apiDetailedStats, setApiDetailedStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -341,16 +400,26 @@ const GameStatsPage = ({ activeLeague }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // Get game from location state or use default
   const gameFromState = location.state?.game;
 
   useEffect(() => {
-    loadAllGames();
+    // Only load games if sidebar is not collapsed
+    if (!sidebarCollapsed) {
+      loadAllGames();
+    }
+    
     if (gameFromState) {
       setSelectedGame(gameFromState);
       // Save the selected game to localStorage
       localStorage.setItem('selectedGame', JSON.stringify(gameFromState));
+      // Trigger API calls for the game from state
+      loadGameData(gameFromState);
     } else {
       // Try to restore the previously selected game from localStorage
       const savedGame = localStorage.getItem('selectedGame');
@@ -358,13 +427,15 @@ const GameStatsPage = ({ activeLeague }) => {
         try {
           const parsedGame = JSON.parse(savedGame);
           setSelectedGame(parsedGame);
+          // Trigger API calls for the saved game
+          loadGameData(parsedGame);
         } catch (error) {
           console.error('Error parsing saved game:', error);
           localStorage.removeItem('selectedGame');
         }
       }
     }
-  }, [gameFromState]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gameFromState, sidebarCollapsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply dark mode class to document
   useEffect(() => {
@@ -451,7 +522,10 @@ const GameStatsPage = ({ activeLeague }) => {
       if (!gameFromState && allCombinedGames.length > 0) {
         const savedGame = localStorage.getItem('selectedGame');
         if (!savedGame) {
-          setSelectedGame(allCombinedGames[0]);
+          const firstGame = allCombinedGames[0];
+          setSelectedGame(firstGame);
+          // Trigger API calls for the first game
+          loadGameData(firstGame);
         }
       }
     } catch (error) {
@@ -530,10 +604,165 @@ const GameStatsPage = ({ activeLeague }) => {
   };
 
   const handleGameSelect = (game) => {
+    console.log('Game selected:', game);
     setSelectedGame(game);
     // Save the selected game to localStorage
     localStorage.setItem('selectedGame', JSON.stringify(game));
+    
+    // Trigger API calls for the selected game
+    loadGameData(game);
   };
+
+  const toggleSidebar = () => {
+    const newCollapsedState = !sidebarCollapsed;
+    setSidebarCollapsed(newCollapsedState);
+    
+    // Save to localStorage
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newCollapsedState));
+    
+    console.log(`📱 Sidebar ${newCollapsedState ? 'collapsed' : 'expanded'}`);
+    
+    // If expanding, load games
+    if (!newCollapsedState) {
+      console.log('🔄 Loading games because sidebar was expanded');
+      loadAllGames();
+    } else {
+      console.log('💾 Sidebar collapsed - games will not be loaded until expanded');
+    }
+  };
+
+  // Helper function to safely extract values from ESPN API responses
+  const safeExtractValue = (obj, path, fallback = '0') => {
+    try {
+      const keys = path.split('.');
+      let current = obj;
+      for (const key of keys) {
+        if (current && typeof current === 'object' && key in current) {
+          current = current[key];
+          // Handle ESPN API $ref objects
+          if (current && typeof current === 'object' && current.$ref) {
+            return fallback;
+          }
+        } else {
+          return fallback;
+        }
+      }
+      return current !== null && current !== undefined ? current : fallback;
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  // Function to load comprehensive data for a selected game
+  const loadGameData = async (game) => {
+    if (!game || !game.id) {
+      console.log('No game or game ID provided for data loading');
+      return;
+    }
+
+    console.log('🚀 Starting loadGameData for game:', {
+      id: game.id,
+      league: game.league,
+      awayTeam: game.awayTeam,
+      homeTeam: game.homeTeam
+    });
+
+    setGameDataLoading(true);
+    try {
+      console.log('📡 Loading comprehensive game data...');
+      
+      // Load multiple data sources in parallel
+      const [gameSummary, gameDetails, teamStats] = await Promise.all([
+        // Get game summary with player stats
+        footballApi.getGameSummary(game.id, game.league),
+        // Get detailed game data from ESPN Core API
+        footballApi.getGameDetails(game.id, game.league),
+        // Get team season stats
+        loadTeamSeasonStats(game)
+      ]);
+      
+      console.log('📊 Game summary:', gameSummary);
+      console.log('🎮 Game details:', gameDetails);
+      console.log('🏈 Team season stats:', teamStats);
+      
+      // Combine all data sources
+      const combinedStats = {
+        gameId: game.id,
+        gameInfo: game,
+        gameSummary: gameSummary,
+        gameDetails: gameDetails,
+        teamStats: teamStats,
+        players: gameSummary?.players || []
+      };
+      
+      setApiDetailedStats(combinedStats);
+      console.log('✅ Comprehensive game data loaded:', combinedStats);
+      
+    } catch (error) {
+      console.error('❌ Error loading game data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      setApiDetailedStats(null);
+    } finally {
+      console.log('🏁 Finished loadGameData');
+      setGameDataLoading(false);
+    }
+  };
+
+
+  // Load team season stats for both teams
+  const loadTeamSeasonStats = async (game) => {
+    try {
+      console.log('🏈 Loading season stats for teams:', game.awayTeam, 'and', game.homeTeam);
+      
+      const [awayTeamStats, homeTeamStats] = await Promise.all([
+        loadTeamStats(game.awayTeam, game.league),
+        loadTeamStats(game.homeTeam, game.league)
+      ]);
+      
+      return {
+        awayTeam: {
+          name: game.awayTeam,
+          stats: awayTeamStats
+        },
+        homeTeam: {
+          name: game.homeTeam,
+          stats: homeTeamStats
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ Error loading team season stats:', error);
+      return null;
+    }
+  };
+
+  // Load individual team stats
+  const loadTeamStats = async (teamName, league) => {
+    try {
+      console.log('📈 Loading stats for team:', teamName);
+      
+      // Get team's season statistics
+      const teamStats = await footballApi.getTeamStats(teamName, league);
+      console.log('📊 Team stats for', teamName, ':', teamStats);
+      
+      return teamStats;
+      
+    } catch (error) {
+      console.error('❌ Error loading team stats for', teamName, ':', error);
+      return null;
+    }
+  };
+
+  // Effect to load game data when selectedGame changes
+  useEffect(() => {
+    if (selectedGame && selectedGame.id) {
+      console.log('Selected game changed, loading data for:', selectedGame.id);
+      loadGameData(selectedGame);
+    }
+  }, [selectedGame]);
 
 
   const getLeagueColor = (league) => {
@@ -686,9 +915,14 @@ const GameStatsPage = ({ activeLeague }) => {
     return biggestGames.slice(0, maxGames);
   };
 
-  // Mock detailed stats data
+  // Generate detailed stats data (mock or from API)
   const getDetailedStats = (game) => {
     if (!game) return null;
+    
+    // If we have API data, use it
+    if (apiDetailedStats) {
+      return apiDetailedStats;
+    }
     
     // If game is scheduled (not started yet), return all zeros
     if (game.status === 'Scheduled' || game.status === 'Pre-Game') {
@@ -757,7 +991,8 @@ const GameStatsPage = ({ activeLeague }) => {
     };
   };
 
-  const detailedStats = getDetailedStats(selectedGame);
+  const baseDetailedStats = getDetailedStats(selectedGame);
+  const detailedStats = apiDetailedStats || baseDetailedStats;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -875,19 +1110,67 @@ const GameStatsPage = ({ activeLeague }) => {
 
       <div className="flex h-[calc(100vh-64px)]">
         {/* Left Sidebar - Games List */}
-        <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+        <div className={`${sidebarCollapsed ? 'w-12' : 'w-64'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-all duration-300`}>
           <div className="p-3">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">All Games</h2>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {(() => {
-                  const filteredGames = filterGamesBySearch(allGames.filter(game => game.league === activeLeague));
-                  const displayedGames = getBiggestGames(filteredGames);
-                  return searchTerm ? `${displayedGames.length} of ${filteredGames.length} games` : `${displayedGames.length} games`;
-                })()}
-              </div>
+              {!sidebarCollapsed && (
+                <>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">All Games</h2>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      const filteredGames = filterGamesBySearch(allGames.filter(game => game.league === activeLeague));
+                      const displayedGames = getBiggestGames(filteredGames);
+                      return searchTerm ? `${displayedGames.length} of ${filteredGames.length} games` : `${displayedGames.length} games`;
+                    })()}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {sidebarCollapsed ? (
+                  <div className="w-4 h-4 text-gray-500 dark:text-gray-400">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-4 h-4 text-gray-500 dark:text-gray-400">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
             </div>
             
+            {!sidebarCollapsed && (
+              <>
+                {/* League Filter */}
+                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 mb-3">
+              <button
+                onClick={() => setActiveLeague('nfl')}
+                className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-md transition-colors ${
+                  activeLeague === 'nfl'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                NFL
+              </button>
+              <button
+                onClick={() => setActiveLeague('ncaa')}
+                className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-md transition-colors ${
+                  activeLeague === 'ncaa'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                NCAA
+              </button>
+            </div>
 
             {/* Search Bar */}
             <div className="mb-3">
@@ -1302,6 +1585,8 @@ const GameStatsPage = ({ activeLeague }) => {
                 </>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -1313,19 +1598,34 @@ const GameStatsPage = ({ activeLeague }) => {
                       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center">
                               <button
                                 onClick={() => navigate('/team', { state: { team: { name: selectedGame.awayTeam, league: selectedGame.league } } })}
                                 className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                               >
                                 {selectedGame.awayTeam}
                               </button>
-                              {' vs '}
+                              <span className="mx-3">vs</span>
                               <button
                                 onClick={() => navigate('/team', { state: { team: { name: selectedGame.homeTeam, league: selectedGame.league } } })}
                                 className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                               >
                                 {selectedGame.homeTeam}
+                              </button>
+                              {gameDataLoading && (
+                                <div className="ml-3 flex items-center">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                                  <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading data...</span>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => {
+                                  console.log('🧪 Manual API test triggered');
+                                  loadGameData(selectedGame);
+                                }}
+                                className="ml-3 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                              >
+                                Test API
                               </button>
                             </h2>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
@@ -1381,6 +1681,24 @@ const GameStatsPage = ({ activeLeague }) => {
                     Game Statistics
                   </h2>
                   
+                  {/* Show warning for scheduled games */}
+                  {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            This game is scheduled and hasn't started yet. Game statistics will be available once the game begins.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Compact Game Stats */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
                   <div className="grid grid-cols-2 gap-8">
@@ -1388,41 +1706,55 @@ const GameStatsPage = ({ activeLeague }) => {
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                          {detailedStats.awayTeam.name}
+                          {selectedGame.awayTeam}
                         </h3>
                         <div className="text-xl font-bold text-primary-600">
-                          {detailedStats.awayTeam.score}
+                          {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameSummary?.awayTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[0]?.score || selectedGame.awayScore || '0')}
                         </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Total Yards</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.totalYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.totalYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.0.stats.0.value') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Passing</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.passingYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.passingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.1.stats.0.value') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Rushing</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.rushingYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.rushingYards') || safeExtractValue(detailedStats, 'gameDetails.competitions.0.competitors.0.statistics.2.stats.0.value') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Turnovers</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.turnovers}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.turnovers') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">First Downs</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.firstDowns}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.firstDowns') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Time of Poss</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.timeOfPossession}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0:00' : safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.timeOfPossession') || '0:00'}
+                          </span>
                         </div>
                         <div className="flex justify-between col-span-2">
                           <span className="text-gray-600 dark:text-gray-300">Penalties</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.awayTeam.stats.penalties} ({detailedStats.awayTeam.stats.penaltyYards} yds)</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0 (0 yds)' : `${safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.penalties') || '0'} (${safeExtractValue(detailedStats, 'gameSummary.awayTeam.stats.penaltyYards') || '0'} yds)`}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1431,53 +1763,185 @@ const GameStatsPage = ({ activeLeague }) => {
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                          {detailedStats.homeTeam.name}
+                          {selectedGame.homeTeam}
                         </h3>
                         <div className="text-xl font-bold text-primary-600">
-                          {detailedStats.homeTeam.score}
+                          {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : (detailedStats?.gameSummary?.homeTeam?.score || detailedStats?.gameDetails?.competitions?.[0]?.competitors?.[1]?.score || selectedGame.homeScore || '0')}
                         </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Total Yards</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.totalYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.totalYards') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Passing</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.passingYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.passingYards') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Rushing</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.rushingYards}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.rushingYards') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Turnovers</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.turnovers}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.turnovers') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">First Downs</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.firstDowns}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.firstDowns') || '0'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-300">Time of Poss</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.timeOfPossession}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0:00' : safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.timeOfPossession') || '0:00'}
+                          </span>
                         </div>
                         <div className="flex justify-between col-span-2">
                           <span className="text-gray-600 dark:text-gray-300">Penalties</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{detailedStats.homeTeam.stats.penalties} ({detailedStats.homeTeam.stats.penaltyYards} yds)</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') ? '0 (0 yds)' : `${safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.penalties') || '0'} (${safeExtractValue(detailedStats, 'gameSummary.homeTeam.stats.penaltyYards') || '0'} yds)`}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Team Season Statistics Section */}
+                {detailedStats?.teamStats && (
+                  <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                      <Award className="w-6 h-6 mr-3 text-primary-600" />
+                      Team Season Statistics
+                    </h2>
+                    
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                      <div className="grid grid-cols-2 gap-8">
+                        {/* Away Team Season Stats */}
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                            {detailedStats.teamStats.awayTeam.name} Season Stats
+                          </h3>
+                          
+                          {detailedStats.teamStats.awayTeam.stats ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Points/Game</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.offense?.pointsPerGame || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Total Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.offense?.totalYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Passing Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.offense?.passingYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Rushing Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.offense?.rushingYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Turnovers</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.offense?.turnovers || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Points Allowed/Game</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.awayTeam.stats.stats?.defense?.pointsAllowedPerGame || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">Season statistics not available</p>
+                          )}
+                        </div>
+
+                        {/* Home Team Season Stats */}
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                            {detailedStats.teamStats.homeTeam.name} Season Stats
+                          </h3>
+                          
+                          {detailedStats.teamStats.homeTeam.stats ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Points/Game</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.offense?.pointsPerGame || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Total Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.offense?.totalYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Passing Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.offense?.passingYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Rushing Yards</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.offense?.rushingYards || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Turnovers</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.offense?.turnovers || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600 dark:text-gray-300">Points Allowed/Game</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {detailedStats.teamStats.homeTeam.stats.stats?.defense?.pointsAllowedPerGame || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">Season statistics not available</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Team Rosters */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Away Team Roster */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                      {detailedStats.awayTeam.name} Roster
+                      {selectedGame.awayTeam} Roster
                     </h3>
                     
                     <div className="space-y-3">
@@ -1485,42 +1949,71 @@ const GameStatsPage = ({ activeLeague }) => {
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Offense</h4>
                         <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">QB - John Smith</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0/0, 0 yds, 0 TD' 
-                                : '24/38, 287 yds, 2 TD'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">RB - Mike Johnson</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 car, 0 yds, 0 TD' 
-                                : '18 car, 95 yds, 1 TD'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">WR - Chris Davis</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 rec, 0 yds, 0 TD' 
-                                : '8 rec, 124 yds, 1 TD'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">TE - Alex Wilson</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 rec, 0 yds' 
-                                : '5 rec, 67 yds'
-                              }
-                            </span>
-                          </div>
+                          {(() => {
+                            // Get players for this team from API data
+                            const teamPlayers = detailedStats?.players?.filter(player => 
+                              player.team === selectedGame.awayTeam
+                            ) || [];
+                            
+                            // If no API data, show mock data
+                            if (teamPlayers.length === 0) {
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">QB - John Smith</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0/0, 0 yds, 0 TD' 
+                                        : '24/38, 287 yds, 2 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">RB - Mike Johnson</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 car, 0 yds, 0 TD' 
+                                        : '18 car, 95 yds, 1 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">WR - Chris Davis</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 rec, 0 yds, 0 TD'
+                                        : '8 rec, 124 yds, 1 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">TE - Alex Wilson</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 rec, 0 yds'
+                                        : '5 rec, 67 yds'
+                                      }
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            
+                            // Show real player data from API
+                            return teamPlayers.slice(0, 4).map((player, index) => (
+                              <div key={index} className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-300">
+                                  {player.position} - {player.name}
+                                </span>
+                                <span className="text-gray-900 dark:text-white">
+                                  {player.gameStats ? 
+                                    `${player.gameStats.passingCompletions || 0}/${player.gameStats.passingAttempts || 0}, ${player.gameStats.passingYards || 0} yds, ${player.gameStats.passingTouchdowns || 0} TD` :
+                                    '0/0, 0 yds, 0 TD'
+                                  }
+                                </span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
 
@@ -1528,33 +2021,63 @@ const GameStatsPage = ({ activeLeague }) => {
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Defense</h4>
                         <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">LB - Tom Brown</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 sacks' 
-                                : '12 tackles, 1 sack'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">CB - Sam Green</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 INT' 
-                                : '8 tackles, 1 INT'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">DE - Rob White</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 sacks' 
-                                : '6 tackles, 2 sacks'
-                              }
-                            </span>
-                          </div>
+                          {(() => {
+                            // Get defensive players for this team from API data
+                            const teamPlayers = detailedStats?.players?.filter(player => 
+                              player.team === selectedGame.awayTeam && 
+                              ['LB', 'CB', 'DE', 'DT', 'S'].includes(player.position)
+                            ) || [];
+                            
+                            // If no API data, show mock data
+                            if (teamPlayers.length === 0) {
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">LB - Tom Brown</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 sacks' 
+                                        : '12 tackles, 1 sack'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">CB - Sam Green</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 INT' 
+                                        : '8 tackles, 1 INT'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">DE - Rob White</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 sacks' 
+                                        : '6 tackles, 2 sacks'
+                                      }
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            
+                            // Show real defensive player data from API
+                            return teamPlayers.slice(0, 3).map((player, index) => (
+                              <div key={index} className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-300">
+                                  {player.position} - {player.name}
+                                </span>
+                                <span className="text-gray-900 dark:text-white">
+                                  {player.gameStats ? 
+                                    `${player.gameStats.tackles || 0} tackles, ${player.gameStats.sacks || 0} sacks` :
+                                    '0 tackles, 0 sacks'
+                                  }
+                                </span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1563,7 +2086,7 @@ const GameStatsPage = ({ activeLeague }) => {
                   {/* Home Team Roster */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                      {detailedStats.homeTeam.name} Roster
+                      {selectedGame.homeTeam} Roster
                     </h3>
                     
                     <div className="space-y-3">
@@ -1571,42 +2094,71 @@ const GameStatsPage = ({ activeLeague }) => {
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Offense</h4>
                         <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">QB - David Lee</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0/0, 0 yds, 0 TD' 
-                                : '19/32, 245 yds, 1 TD'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">RB - James Taylor</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 car, 0 yds, 0 TD' 
-                                : '22 car, 112 yds, 2 TD'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">WR - Mark Anderson</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 rec, 0 yds' 
-                                : '6 rec, 89 yds'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">TE - Steve Clark</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 rec, 0 yds, 0 TD' 
-                                : '4 rec, 56 yds, 1 TD'
-                              }
-                            </span>
-                          </div>
+                          {(() => {
+                            // Get players for this team from API data
+                            const teamPlayers = detailedStats?.players?.filter(player => 
+                              player.team === selectedGame.homeTeam
+                            ) || [];
+                            
+                            // If no API data, show mock data
+                            if (teamPlayers.length === 0) {
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">QB - David Lee</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0/0, 0 yds, 0 TD' 
+                                        : '19/32, 245 yds, 1 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">RB - James Taylor</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 car, 0 yds, 0 TD' 
+                                        : '22 car, 112 yds, 2 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">WR - Mark Anderson</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 rec, 0 yds' 
+                                        : '6 rec, 89 yds'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">TE - Steve Clark</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 rec, 0 yds, 0 TD' 
+                                        : '4 rec, 56 yds, 1 TD'
+                                      }
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            
+                            // Show real player data from API
+                            return teamPlayers.slice(0, 4).map((player, index) => (
+                              <div key={index} className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-300">
+                                  {player.position} - {player.name}
+                                </span>
+                                <span className="text-gray-900 dark:text-white">
+                                  {player.gameStats ? 
+                                    `${player.gameStats.passingCompletions || 0}/${player.gameStats.passingAttempts || 0}, ${player.gameStats.passingYards || 0} yds, ${player.gameStats.passingTouchdowns || 0} TD` :
+                                    '0/0, 0 yds, 0 TD'
+                                  }
+                                </span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
 
@@ -1614,33 +2166,63 @@ const GameStatsPage = ({ activeLeague }) => {
                       <div>
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Defense</h4>
                         <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">LB - Kevin Moore</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 sacks' 
-                                : '10 tackles, 1 sack'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">CB - Ryan King</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 INT' 
-                                : '7 tackles, 2 INT'
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-300">DE - Paul Miller</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                ? '0 tackles, 0 sacks' 
-                                : '5 tackles, 1 sack'
-                              }
-                            </span>
-                          </div>
+                          {(() => {
+                            // Get defensive players for this team from API data
+                            const teamPlayers = detailedStats?.players?.filter(player => 
+                              player.team === selectedGame.homeTeam && 
+                              ['LB', 'CB', 'DE', 'DT', 'S'].includes(player.position)
+                            ) || [];
+                            
+                            // If no API data, show mock data
+                            if (teamPlayers.length === 0) {
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">LB - Kevin Moore</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 sacks' 
+                                        : '10 tackles, 1 sack'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">CB - Ryan King</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 INT' 
+                                        : '7 tackles, 2 INT'
+                                      }
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600 dark:text-gray-300">DE - Paul Miller</span>
+                                    <span className="text-gray-900 dark:text-white">
+                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                        ? '0 tackles, 0 sacks' 
+                                        : '5 tackles, 1 sack'
+                                      }
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            
+                            // Show real defensive player data from API
+                            return teamPlayers.slice(0, 3).map((player, index) => (
+                              <div key={index} className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-300">
+                                  {player.position} - {player.name}
+                                </span>
+                                <span className="text-gray-900 dark:text-white">
+                                  {player.gameStats ? 
+                                    `${player.gameStats.tackles || 0} tackles, ${player.gameStats.sacks || 0} sacks` :
+                                    '0 tackles, 0 sacks'
+                                  }
+                                </span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1655,7 +2237,7 @@ const GameStatsPage = ({ activeLeague }) => {
                     All Statistics
                   </h2>
                   
-                  <AllStatisticsSection selectedGame={selectedGame} />
+                  <AllStatisticsSection selectedGame={selectedGame} teamStats={detailedStats?.teamStats} />
                 </div>
               </div>
 

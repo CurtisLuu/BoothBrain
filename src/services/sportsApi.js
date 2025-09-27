@@ -322,6 +322,126 @@ class SportsApiService {
     }
   }
 
+  // Get team statistics for a specific team
+  async getTeamStats(teamName, league) {
+    try {
+      console.log(`Fetching team stats for ${teamName} in ${league} from ESPN API...`);
+      
+      // Search for team in current season games to get team ID
+      const teamId = await this.findTeamId(teamName, league);
+      if (!teamId) {
+        console.log(`Team ID not found for ${teamName}`);
+        return null;
+      }
+
+      // Get team statistics
+      const teamStatsUrl = `https://site.api.espn.com/apis/site/v2/sports/football/${league}/teams/${teamId}/stats`;
+      
+      const response = await fetch(teamStatsUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`Team stats for ${teamName}:`, data);
+      
+      return this.formatTeamStats(data, teamName);
+    } catch (error) {
+      console.error(`Error fetching team stats for ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Find team ID by searching through games
+  async findTeamId(teamName, league) {
+    try {
+      console.log(`Searching for team ID for ${teamName} in ${league}...`);
+      
+      // Get current week games to find team
+      const currentWeek = this.getCurrentWeek();
+      const games = await this.getNFLGamesByWeek(currentWeek);
+      
+      // Search for team in games
+      const teamGame = games.find(game => 
+        game.awayTeam.toLowerCase().includes(teamName.toLowerCase()) ||
+        game.homeTeam.toLowerCase().includes(teamName.toLowerCase())
+      );
+      
+      if (teamGame) {
+        // Extract team ID from game data
+        const teamId = teamGame.awayTeam.toLowerCase().includes(teamName.toLowerCase()) 
+          ? teamGame.awayTeamId 
+          : teamGame.homeTeamId;
+        console.log(`Found team ID for ${teamName}:`, teamId);
+        return teamId;
+      }
+      
+      console.log(`Team ID not found for ${teamName}`);
+      return null;
+    } catch (error) {
+      console.error(`Error finding team ID for ${teamName}:`, error);
+      return null;
+    }
+  }
+
+  // Format team statistics from ESPN API
+  formatTeamStats(data, teamName) {
+    try {
+      console.log('Formatting team stats for:', teamName);
+      
+      if (!data || !data.stats) {
+        console.log('No team stats data available');
+        return null;
+      }
+
+      const stats = data.stats;
+      const teamStats = {
+        teamName: teamName,
+        season: data.season || new Date().getFullYear(),
+        stats: {
+          offense: {},
+          defense: {},
+          specialTeams: {}
+        }
+      };
+
+      // Process offensive stats
+      if (stats.offense) {
+        teamStats.stats.offense = {
+          pointsPerGame: stats.offense.pointsPerGame || 0,
+          totalYards: stats.offense.totalYards || 0,
+          passingYards: stats.offense.passingYards || 0,
+          rushingYards: stats.offense.rushingYards || 0,
+          turnovers: stats.offense.turnovers || 0
+        };
+      }
+
+      // Process defensive stats
+      if (stats.defense) {
+        teamStats.stats.defense = {
+          pointsAllowedPerGame: stats.defense.pointsAllowedPerGame || 0,
+          totalYardsAllowed: stats.defense.totalYardsAllowed || 0,
+          passingYardsAllowed: stats.defense.passingYardsAllowed || 0,
+          rushingYardsAllowed: stats.defense.rushingYardsAllowed || 0,
+          takeaways: stats.defense.takeaways || 0
+        };
+      }
+
+      console.log('Formatted team stats:', teamStats);
+      return teamStats;
+    } catch (error) {
+      console.error('Error formatting team stats:', error);
+      return null;
+    }
+  }
+
   // Get NCAA games by specific week
   async getNCAAGamesByWeek(week) {
     try {
@@ -381,6 +501,68 @@ class SportsApiService {
       return this.formatGameSummary(data, league);
     } catch (error) {
       console.error('Error fetching game summary from ESPN:', error);
+      return null;
+    }
+  }
+
+  // Get detailed game data using ESPN's core API
+  async getGameDetails(gameId, league = 'nfl') {
+    try {
+      console.log(`Fetching detailed game data for ${gameId} in ${league}...`);
+      
+      // Use ESPN's core API for detailed game information
+      const gameUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/${league}/events/${gameId}`;
+      console.log('Game details URL:', gameUrl);
+      
+      const response = await fetch(gameUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN Core API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Game details API response:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching game details from ESPN Core API:', error);
+      return null;
+    }
+  }
+
+  // Get team statistics using ESPN's core API
+  async getTeamStatistics(teamId, league = 'nfl') {
+    try {
+      console.log(`Fetching team statistics for ${teamId} in ${league}...`);
+      
+      // Use ESPN's core API for team statistics
+      const teamUrl = `https://sports.core.api.espn.com/v2/sports/football/leagues/${league}/teams/${teamId}/statistics`;
+      console.log('Team stats URL:', teamUrl);
+      
+      const response = await fetch(teamUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN Core API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Team statistics API response:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching team statistics from ESPN Core API:', error);
       return null;
     }
   }
@@ -447,35 +629,80 @@ class SportsApiService {
 
   // Format game summary data with player statistics
   formatGameSummary(data, league) {
-    if (!data || !data.boxscore) {
-      console.log('No boxscore data available');
+    console.log('Raw ESPN API response structure:', data);
+    
+    if (!data) {
+      console.log('No data available from ESPN API');
       return null;
     }
 
-    const boxscore = data.boxscore;
-    const players = boxscore.players || [];
-    
+    // Check different possible data structures
+    let players = [];
+    let gameInfo = null;
+
+    // Try different possible paths for player data
+    if (data.boxscore && data.boxscore.players) {
+      players = data.boxscore.players;
+      console.log('Found players in data.boxscore.players:', players.length);
+    } else if (data.players) {
+      players = data.players;
+      console.log('Found players in data.players:', players.length);
+    } else if (data.boxscore && data.boxscore.teams) {
+      // Try to extract players from teams
+      const teams = data.boxscore.teams;
+      players = [];
+      teams.forEach(team => {
+        if (team.statistics && team.statistics[0] && team.statistics[0].athletes) {
+          players = players.concat(team.statistics[0].athletes);
+        }
+      });
+      console.log('Found players in data.boxscore.teams:', players.length);
+    } else {
+      console.log('No player data found in any expected location');
+      console.log('Available data keys:', Object.keys(data));
+      if (data.boxscore) {
+        console.log('Boxscore keys:', Object.keys(data.boxscore));
+      }
+    }
+
+    // Get game info
+    if (data.header) {
+      gameInfo = data.header;
+    } else if (data.gameInfo) {
+      gameInfo = data.gameInfo;
+    }
+
     console.log(`Formatting game summary with ${players.length} players`);
 
-    const playerStats = players.map(player => {
-      const stats = player.stats || [];
+    const playerStats = players.map((player, index) => {
+      // Handle different player data structures
+      let playerData = player;
+      let stats = [];
+      
+      if (player.athlete) {
+        playerData = player.athlete;
+        stats = player.stats || [];
+      } else if (player.stats) {
+        stats = player.stats;
+      }
+
       const seasonStats = stats.find(stat => stat.label === 'Season') || { stats: [] };
       const gameStats = stats.find(stat => stat.label === 'Game') || { stats: [] };
       
       return {
-        id: player.athlete?.id,
-        name: player.athlete?.displayName || 'Unknown Player',
-        position: player.athlete?.position?.abbreviation || 'N/A',
-        team: player.team?.displayName || 'Unknown Team',
-        jersey: player.athlete?.jersey || 'N/A',
+        id: playerData?.id || player.id || `player-${index}`,
+        name: playerData?.displayName || player.displayName || `Player ${index + 1}`,
+        position: playerData?.position?.abbreviation || player.position || 'N/A',
+        team: player.team?.displayName || player.team || 'Unknown Team',
+        jersey: playerData?.jersey || player.jersey || 'N/A',
         seasonStats: this.formatPlayerStats(seasonStats.stats, league),
         gameStats: this.formatPlayerStats(gameStats.stats, league)
       };
     });
 
     return {
-      gameId: data.header?.id,
-      gameInfo: data.header,
+      gameId: gameInfo?.id || data.id,
+      gameInfo: gameInfo,
       players: playerStats
     };
   }

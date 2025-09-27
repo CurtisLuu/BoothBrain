@@ -3,7 +3,7 @@ import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Fi
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 
-const SchedulePage = ({ activeLeague }) => {
+const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activePage, setActivePage] = useState('schedule');
@@ -41,25 +41,34 @@ const SchedulePage = ({ activeLeague }) => {
   const loadGames = async () => {
     setLoading(true);
     try {
-      // Get current week data to extract teams
-      const currentWeekData = activeLeague === 'nfl' 
-        ? await footballApi.getNFLGames() 
-        : await footballApi.getNCAAGames();
+      // Get comprehensive game data from API
+      const [currentWeekData, previousWeekData, nextWeekData] = await Promise.all([
+        activeLeague === 'nfl' ? footballApi.getNFLGames() : footballApi.getNCAAGames(),
+        activeLeague === 'nfl' ? footballApi.getPreviousWeekNFLGames() : footballApi.getPreviousWeekNCAAGames(),
+        activeLeague === 'nfl' ? footballApi.getNextWeekNFLGames() : footballApi.getNextWeekNCAAGames()
+      ]);
       
       // Extract unique teams for filter
       const teams = new Set();
-      currentWeekData.forEach(game => {
+      [...currentWeekData, ...previousWeekData, ...nextWeekData].forEach(game => {
         teams.add(game.homeTeam);
         teams.add(game.awayTeam);
       });
       setAvailableTeams(['all', ...Array.from(teams).sort()]);
       
-      // If no team selected or 'all' selected, show current week games
+      // Combine all games with proper categorization
+      const allGames = [
+        ...previousWeekData.map(game => ({ ...game, weekType: 'previous', week: 'Previous Week' })),
+        ...currentWeekData.map(game => ({ ...game, weekType: 'current', week: 'Current Week' })),
+        ...nextWeekData.map(game => ({ ...game, weekType: 'next', week: 'Next Week' }))
+      ];
+      
+      // If no team selected or 'all' selected, show all games
       if (selectedTeam === 'all') {
-        setGames(currentWeekData);
+        setGames(allGames);
       } else {
-        // Generate full season for selected team
-        const teamSeasonGames = generateTeamSeasonSchedule(selectedTeam, currentWeekData, activeLeague);
+        // Generate comprehensive season for selected team
+        const teamSeasonGames = generateComprehensiveTeamSchedule(selectedTeam, allGames, activeLeague);
         setGames(teamSeasonGames);
       }
       
@@ -93,20 +102,20 @@ const SchedulePage = ({ activeLeague }) => {
     });
   };
 
-  // Generate full season schedule for a specific team
-  const generateTeamSeasonSchedule = (teamName, currentWeekData, league) => {
+  // Generate comprehensive season schedule for a specific team
+  const generateComprehensiveTeamSchedule = (teamName, allGamesData, league) => {
     const seasonGames = [];
     const totalWeeks = league === 'nfl' ? 18 : 12; // NFL has 18 weeks, NCAA has 12 weeks
     
-    // Get all teams from current week data for opponents
+    // Get all teams from API data for opponents
     const allTeams = new Set();
-    currentWeekData.forEach(game => {
+    allGamesData.forEach(game => {
       allTeams.add(game.homeTeam);
       allTeams.add(game.awayTeam);
     });
     const teamList = Array.from(allTeams).filter(team => team !== teamName);
     
-    // Generate games for each week
+    // Generate games for each week with past games first
     for (let week = 1; week <= totalWeeks; week++) {
       // Determine if this is a past, current, or future week
       const currentDate = new Date();
@@ -125,18 +134,19 @@ const SchedulePage = ({ activeLeague }) => {
       const homeTeam = isHome ? teamName : opponent;
       const awayTeam = isHome ? opponent : teamName;
       
-      // Generate realistic scores based on week status
-      let homeScore, awayScore, status, time;
+      // Generate realistic scores and status based on week
+      let homeScore, awayScore, status, time, weekType;
       
       if (isPastWeek) {
-        // Past games - completed with scores
+        // Past games - completed with realistic scores
         homeScore = Math.floor(Math.random() * 35) + 10;
         awayScore = Math.floor(Math.random() * 35) + 10;
         status = 'Final';
-        time = '1:00 PM ET';
+        time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
+        weekType = 'previous';
       } else if (isCurrentWeek) {
         // Current week - might be live or upcoming
-        const isLive = Math.random() > 0.5;
+        const isLive = Math.random() > 0.3; // 70% chance of being live
         if (isLive) {
           homeScore = Math.floor(Math.random() * 28) + 7;
           awayScore = Math.floor(Math.random() * 28) + 7;
@@ -146,14 +156,16 @@ const SchedulePage = ({ activeLeague }) => {
           homeScore = 0;
           awayScore = 0;
           status = 'Upcoming';
-          time = '1:00 PM ET';
+          time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
         }
+        weekType = 'current';
       } else {
         // Future games - no scores yet
         homeScore = 0;
         awayScore = 0;
         status = 'Upcoming';
-        time = '1:00 PM ET';
+        time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
+        weekType = 'next';
       }
       
       const game = {
@@ -170,13 +182,19 @@ const SchedulePage = ({ activeLeague }) => {
           day: 'numeric'
         }),
         week: `Week ${week}`,
+        weekType,
         league: league
       };
       
       seasonGames.push(game);
     }
     
-    return seasonGames;
+    // Sort games to show past games first, then current, then future
+    return seasonGames.sort((a, b) => {
+      const weekA = parseInt(a.week.replace('Week ', ''));
+      const weekB = parseInt(b.week.replace('Week ', ''));
+      return weekA - weekB; // Past games (lower week numbers) first
+    });
   };
 
 
@@ -189,18 +207,49 @@ const SchedulePage = ({ activeLeague }) => {
     );
   };
 
-  // Group games by date
+  // Group games by date with proper sorting
   const groupGamesByDate = (games) => {
     const filteredGames = filterGamesByTeam(games, selectedTeam);
+    
+    // Sort games by week type and date (past games first)
+    const sortedGames = filteredGames.sort((a, b) => {
+      // First sort by week type: previous, current, next
+      const weekTypeOrder = { 'previous': 0, 'current': 1, 'next': 2 };
+      const typeA = weekTypeOrder[a.weekType] || 1;
+      const typeB = weekTypeOrder[b.weekType] || 1;
+      
+      if (typeA !== typeB) {
+        return typeA - typeB;
+      }
+      
+      // Then sort by week number within each type
+      const weekA = parseInt(a.week?.replace('Week ', '') || '0');
+      const weekB = parseInt(b.week?.replace('Week ', '') || '0');
+      return weekA - weekB;
+    });
+    
     const grouped = {};
-    filteredGames.forEach(game => {
+    sortedGames.forEach(game => {
       const date = game.date || 'TBD';
       if (!grouped[date]) {
         grouped[date] = [];
       }
       grouped[date].push(game);
     });
-    return grouped;
+    
+    // Sort dates chronologically (past dates first)
+    const sortedDates = Object.keys(grouped).sort((a, b) => {
+      if (a === 'TBD') return 1;
+      if (b === 'TBD') return -1;
+      return new Date(a) - new Date(b);
+    });
+    
+    const sortedGrouped = {};
+    sortedDates.forEach(date => {
+      sortedGrouped[date] = grouped[date];
+    });
+    
+    return sortedGrouped;
   };
 
   // Generate search suggestions
@@ -444,13 +493,13 @@ const SchedulePage = ({ activeLeague }) => {
                   >
                     {availableTeams.map(team => (
                       <option key={team} value={team}>
-                        {team === 'all' ? 'All Teams (Current Week Only)' : `${team} (Full Season)`}
+                        {team === 'all' ? 'All Teams (All Games)' : `${team} (Complete Season)`}
                       </option>
                     ))}
                   </select>
                 </div>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Select a team to view their complete regular season schedule with past, current, and future games.
+                  Select a team to view their complete regular season schedule. Past games are shown at the top with final scores.
                 </p>
               </div>
             </div>
@@ -470,16 +519,32 @@ const SchedulePage = ({ activeLeague }) => {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {selectedTeam === 'all' 
-                    ? `${activeLeague.toUpperCase()} Schedule - Current Week`
-                    : `${selectedTeam} - Full Season Schedule`
+                    ? `${activeLeague.toUpperCase()} Schedule - All Games`
+                    : `${selectedTeam} - Complete Season Schedule`
                   }
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   {selectedTeam === 'all' 
-                    ? 'Showing all games for the current week'
-                    : `Complete regular season schedule for ${selectedTeam}`
+                    ? 'Showing past, current, and upcoming games'
+                    : `Complete regular season schedule for ${selectedTeam} with past games at the top`
                   }
                 </p>
+              </div>
+              
+              {/* League Tabs */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveLeague('nfl')}
+                  className={`tab-button ${activeLeague === 'nfl' ? 'active' : 'inactive'}`}
+                >
+                  NFL
+                </button>
+                <button
+                  onClick={() => setActiveLeague('ncaa')}
+                  className={`tab-button ${activeLeague === 'ncaa' ? 'active' : 'inactive'}`}
+                >
+                  NCAA
+                </button>
               </div>
             </div>
             <div className="space-y-8">
