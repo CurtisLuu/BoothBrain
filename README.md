@@ -5,10 +5,11 @@ A modern web application that provides AI-powered football analytics and insight
 ## Features
 
 - 🏈 **Dual League Support**: Toggle between NFL and NCAA games
-- 🤖 **AI Chat Assistant**: Powered by Cedar-OS for intelligent conversations about games, stats, and players
-- 📊 **Real-time Analytics**: Live game statistics and performance metrics
+- 📊 **Live Game Data**: Real-time scores and game information via RapidAPI
+- 🔄 **Auto-Refresh**: Games update automatically every 5 minutes
+- ⚡ **Real-time Updates**: Live scores, game status, and team information
 - 🎨 **Modern UI**: Clean, responsive design with Tailwind CSS
-- 💬 **Interactive Chat**: Floating chat widget for instant AI assistance
+- 📱 **Responsive Design**: Works perfectly on all device sizes
 
 ## Getting Started
 
@@ -16,6 +17,17 @@ A modern web application that provides AI-powered football analytics and insight
 
 - Node.js (v14 or higher)
 - npm or yarn
+- RapidAPI account and API key
+
+### API Setup
+
+1. Sign up for a free account at [RapidAPI](https://rapidapi.com/)
+2. Subscribe to the [Free API Live Football Data](https://rapidapi.com/Creativesdev/api/free-api-live-football-data)
+3. Get your API key from the RapidAPI dashboard
+4. Create a `.env` file in the root directory:
+```bash
+REACT_APP_RAPIDAPI_KEY=your-rapidapi-key-here
+```
 
 ### Installation
 
@@ -30,12 +42,14 @@ cd football.ai
 npm install
 ```
 
-3. Start the development server:
+3. Set up your API key (see API Setup above)
+
+4. Start the development server:
 ```bash
 npm start
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+5. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
 ## Tech Stack
 
