@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun } from 'lucide-react';
 import GameCard from './components/GameCard';
+import GameStatsPage from './components/GameStatsPage';
 import footballApi from './services/footballApi';
 
-function App() {
+// Main Dashboard Component
+function Dashboard() {
   const [activeTab, setActiveTab] = useState('nfl');
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
@@ -56,6 +59,58 @@ function App() {
   };
 
   const currentGames = activeTab === 'nfl' ? nflGames : ncaaGames;
+
+  // Group games by date
+  const groupGamesByDate = (games) => {
+    const grouped = games.reduce((acc, game) => {
+      const date = game.date || 'TBD';
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(game);
+      return acc;
+    }, {});
+
+    // Sort dates and return as array of {date, games}
+    return Object.keys(grouped)
+      .sort((a, b) => {
+        // Sort by date, with 'TBD' at the end
+        if (a === 'TBD') return 1;
+        if (b === 'TBD') return -1;
+        return new Date(a) - new Date(b);
+      })
+      .map(date => ({
+        date,
+        games: grouped[date].sort((a, b) => {
+          // Sort games within each date by time
+          return a.time.localeCompare(b.time);
+        })
+      }));
+  };
+
+  const groupedGames = groupGamesByDate(currentGames);
+
+  // Get current week from the games data
+  const getCurrentWeek = (games) => {
+    if (games.length === 0) return '1';
+    
+    // Find the most common week in the games
+    const weekCounts = games.reduce((acc, game) => {
+      const week = game.week || 'Week 1';
+      const weekNumber = week.replace('Week ', '');
+      acc[weekNumber] = (acc[weekNumber] || 0) + 1;
+      return acc;
+    }, {});
+    
+    // Return the week with the most games
+    const mostCommonWeek = Object.keys(weekCounts).reduce((a, b) => 
+      weekCounts[a] > weekCounts[b] ? a : b
+    );
+    
+    return mostCommonWeek;
+  };
+
+  const currentWeek = getCurrentWeek(currentGames);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -145,7 +200,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-2xl font-bold text-black dark:text-white">
-              {activeTab === 'nfl' ? 'Recent NFL Games' : ' Recent NCAA Games'} 
+              {activeTab === 'nfl' ? `Recent NFL Games for Week ${currentWeek}` : `Recent NCAA Games for Week ${currentWeek}`}
             </h3>
             <div className="flex items-center space-x-4">
               {lastUpdated && (
@@ -186,9 +241,22 @@ function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {currentGames.map((game) => (
-                <GameCard key={game.id} game={game} league={activeTab} />
+            <div className="space-y-8">
+              {groupedGames.map(({ date, games }) => (
+                <div key={date} className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                    <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-300 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      {date}
+                    </h4>
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {games.map((game) => (
+                      <GameCard key={game.id} game={game} league={activeTab} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -242,6 +310,18 @@ function App() {
       </section>
 
     </div>
+  );
+}
+
+// Main App Component with Router
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/stats" element={<GameStatsPage />} />
+      </Routes>
+    </Router>
   );
 }
 

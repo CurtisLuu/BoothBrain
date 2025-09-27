@@ -25,11 +25,12 @@ class SportsApiService {
 
       const data = await response.json();
       console.log('ESPN NFL API response:', data);
+      console.log('Current week NFL events found:', data.events ? data.events.length : 0);
       
       return this.formatESPNGames(data.events || [], 'nfl');
     } catch (error) {
       console.error('Error fetching NFL games from ESPN:', error);
-      return this.getMockNFLGames();
+      return [];
     }
   }
 
@@ -52,21 +53,233 @@ class SportsApiService {
 
       const data = await response.json();
       console.log('ESPN NCAA API response:', data);
+      console.log('Current week NCAA events found:', data.events ? data.events.length : 0);
       
       return this.formatESPNGames(data.events || [], 'ncaa');
     } catch (error) {
       console.error('Error fetching NCAA games from ESPN:', error);
-      return this.getMockNCAAGames();
+      return [];
+    }
+  }
+
+  // Get previous week NFL games from ESPN API
+  async getPreviousWeekNFLGames() {
+    try {
+      console.log('Fetching previous week NFL games from ESPN API...');
+      
+      // First, get current week to determine previous week number
+      const currentResponse = await fetch(this.nflUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!currentResponse.ok) {
+        throw new Error(`ESPN API error: ${currentResponse.status}`);
+      }
+
+      const currentData = await currentResponse.json();
+      const currentWeek = currentData.week?.number || 1;
+      const previousWeek = Math.max(1, currentWeek - 1);
+      
+      console.log('Current week:', currentWeek);
+      console.log('Previous week:', previousWeek);
+      
+      // Fetch games from previous week
+      const previousWeekUrl = `${this.nflUrl}?week=${previousWeek}`;
+      console.log('Previous week URL:', previousWeekUrl);
+      
+      const response = await fetch(previousWeekUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Previous Week NFL API response:', data);
+      console.log('Previous week events found:', data.events ? data.events.length : 0);
+      
+      return this.formatESPNGames(data.events || [], 'nfl');
+    } catch (error) {
+      console.error('Error fetching previous week NFL games from ESPN:', error);
+      return [];
+    }
+  }
+
+  // Get previous week NCAA games from ESPN API
+  async getPreviousWeekNCAAGames() {
+    try {
+      console.log('Fetching previous week NCAA games from ESPN API...');
+      
+      // First, get current week to determine previous week number
+      const currentResponse = await fetch(this.ncaaUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!currentResponse.ok) {
+        throw new Error(`ESPN API error: ${currentResponse.status}`);
+      }
+
+      const currentData = await currentResponse.json();
+      const currentWeek = currentData.week?.number || 1;
+      const previousWeek = Math.max(1, currentWeek - 1);
+      
+      console.log('Current NCAA week:', currentWeek);
+      console.log('Previous NCAA week:', previousWeek);
+      
+      // Fetch games from previous week
+      const previousWeekUrl = `${this.ncaaUrl}?week=${previousWeek}`;
+      console.log('Previous week NCAA URL:', previousWeekUrl);
+      
+      const response = await fetch(previousWeekUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Previous Week NCAA API response:', data);
+      console.log('Previous week NCAA events found:', data.events ? data.events.length : 0);
+      
+      return this.formatESPNGames(data.events || [], 'ncaa');
+    } catch (error) {
+      console.error('Error fetching previous week NCAA games from ESPN:', error);
+      return [];
+    }
+  }
+
+  // Get next week NFL games from ESPN API
+  async getNextWeekNFLGames() {
+    try {
+      console.log('Fetching next week NFL games from ESPN API...');
+      
+      // First, get current week to determine next week number
+      const currentResponse = await fetch(this.nflUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!currentResponse.ok) {
+        throw new Error(`ESPN API error: ${currentResponse.status}`);
+      }
+
+      const currentData = await currentResponse.json();
+      const currentWeek = currentData.week?.number || 1;
+      const nextWeek = currentWeek + 1;
+      
+      console.log('Current week:', currentWeek);
+      console.log('Next week:', nextWeek);
+      
+      // Fetch games from next week
+      const nextWeekUrl = `${this.nflUrl}?week=${nextWeek}`;
+      console.log('Next week URL:', nextWeekUrl);
+      
+      const response = await fetch(nextWeekUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Next Week NFL API response:', data);
+      console.log('Next week events found:', data.events ? data.events.length : 0);
+      
+      return this.formatESPNGames(data.events || [], 'nfl');
+    } catch (error) {
+      console.error('Error fetching next week NFL games from ESPN:', error);
+      return [];
+    }
+  }
+
+  // Get next week NCAA games from ESPN API
+  async getNextWeekNCAAGames() {
+    try {
+      console.log('Fetching next week NCAA games from ESPN API...');
+      
+      // First, get current week to determine next week number
+      const currentResponse = await fetch(this.ncaaUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!currentResponse.ok) {
+        throw new Error(`ESPN API error: ${currentResponse.status}`);
+      }
+
+      const currentData = await currentResponse.json();
+      const currentWeek = currentData.week?.number || 1;
+      const nextWeek = currentWeek + 1;
+      
+      console.log('Current NCAA week:', currentWeek);
+      console.log('Next NCAA week:', nextWeek);
+      
+      // Fetch games from next week
+      const nextWeekUrl = `${this.ncaaUrl}?week=${nextWeek}`;
+      console.log('Next week NCAA URL:', nextWeekUrl);
+      
+      const response = await fetch(nextWeekUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`ESPN API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ESPN Next Week NCAA API response:', data);
+      console.log('Next week NCAA events found:', data.events ? data.events.length : 0);
+      
+      return this.formatESPNGames(data.events || [], 'ncaa');
+    } catch (error) {
+      console.error('Error fetching next week NCAA games from ESPN:', error);
+      return [];
     }
   }
 
   // Format ESPN API data to our game format
   formatESPNGames(events, league) {
     if (!events || events.length === 0) {
-      return league === 'nfl' ? this.getMockNFLGames() : this.getMockNCAAGames();
+      console.log(`No events found for ${league}, returning empty array`);
+      return [];
     }
 
-    return events.slice(0, 3).map((event, index) => {
+    console.log(`Formatting ${events.length} ${league} games from ESPN API`);
+
+    return events.map((event, index) => {
       const competition = event.competitions[0];
       const homeTeam = competition.competitors.find(team => team.homeAway === 'home');
       const awayTeam = competition.competitors.find(team => team.homeAway === 'away');

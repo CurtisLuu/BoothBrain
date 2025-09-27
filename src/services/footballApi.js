@@ -13,8 +13,7 @@ class FootballApiService {
       return games;
     } catch (error) {
       console.error('Error fetching NFL games:', error);
-      // Return mock data as fallback
-      return this.getMockNFLGames();
+      return [];
     }
   }
 
@@ -27,8 +26,59 @@ class FootballApiService {
       return games;
     } catch (error) {
       console.error('Error fetching NCAA games:', error);
-      // Return mock data as fallback
-      return this.getMockNCAAGames();
+      return [];
+    }
+  }
+
+  // Get previous week NFL games using real ESPN API
+  async getPreviousWeekNFLGames() {
+    try {
+      console.log('Fetching previous week NFL games from ESPN API...');
+      const games = await sportsApiService.getPreviousWeekNFLGames();
+      console.log('Previous week NFL games fetched:', games);
+      return games;
+    } catch (error) {
+      console.error('Error fetching previous week NFL games:', error);
+      return [];
+    }
+  }
+
+  // Get previous week NCAA games using real ESPN API
+  async getPreviousWeekNCAAGames() {
+    try {
+      console.log('Fetching previous week NCAA games from ESPN API...');
+      const games = await sportsApiService.getPreviousWeekNCAAGames();
+      console.log('Previous week NCAA games fetched:', games);
+      return games;
+    } catch (error) {
+      console.error('Error fetching previous week NCAA games:', error);
+      return [];
+    }
+  }
+
+  // Get next week NFL games using real ESPN API
+  async getNextWeekNFLGames() {
+    try {
+      console.log('Fetching next week NFL games from ESPN API...');
+      const games = await sportsApiService.getNextWeekNFLGames();
+      console.log('Next week NFL games fetched:', games);
+      return games;
+    } catch (error) {
+      console.error('Error fetching next week NFL games:', error);
+      return [];
+    }
+  }
+
+  // Get next week NCAA games using real ESPN API
+  async getNextWeekNCAAGames() {
+    try {
+      console.log('Fetching next week NCAA games from ESPN API...');
+      const games = await sportsApiService.getNextWeekNCAAGames();
+      console.log('Next week NCAA games fetched:', games);
+      return games;
+    } catch (error) {
+      console.error('Error fetching next week NCAA games:', error);
+      return [];
     }
   }
 

@@ -1,9 +1,16 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clock, TrendingUp } from 'lucide-react';
 
 const GameCard = ({ game, league }) => {
+  const navigate = useNavigate();
+  
   const getLeagueBg = (league) => {
     return league === 'nfl' ? 'bg-football-nfl' : 'bg-football-ncaa';
+  };
+
+  const handleViewStats = () => {
+    navigate('/stats', { state: { game: { ...game, league } } });
   };
 
   return (
@@ -61,7 +68,10 @@ const GameCard = ({ game, league }) => {
             </div>
           </div>
           
-          <button className="flex items-center space-x-1 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors">
+          <button 
+            onClick={handleViewStats}
+            className="flex items-center space-x-1 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
+          >
             <TrendingUp className="w-4 h-4" />
             <span>View Stats</span>
           </button>
