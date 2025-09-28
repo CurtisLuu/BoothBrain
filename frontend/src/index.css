@@ -1,0 +1,45 @@
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .tab-button {
+    @apply px-6 py-3 text-sm font-medium transition-all duration-200 rounded-lg;
+  }
+  
+  .tab-button.active {
+    @apply bg-primary-600 text-white shadow-lg;
+  }
+  
+  .tab-button.inactive {
+    @apply text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600;
+  }
+  
+  .game-card {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .chat-container {
+    @apply fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200;
+  }
+  
+  .hero-section {
+    @apply py-16;
+    background: linear-gradient(to right, #0ea5e9, #0369a1) !important;
+    min-height: 400px;
+  }
+}
