@@ -3,14 +3,22 @@ import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, MapPin, Filter, C
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useSearch } from '../contexts/SearchContext';
 
 const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [activePage, setActivePage] = useState('schedule');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState('all');
@@ -238,54 +246,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     return sortedGrouped;
   };
 
-  // Generate search suggestions
-  const generateSuggestions = (query) => {
-    if (query.length < 2) return [];
-    
-    const allTeams = new Set();
-    games.forEach(game => {
-      allTeams.add(game.homeTeam);
-      allTeams.add(game.awayTeam);
-    });
-    
-    return Array.from(allTeams)
-      .filter(team => team.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 5);
-  };
-
-  // Handle search input change
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  // Find team league
-  const findTeamLeague = (teamName) => {
-    const game = games.find(game => 
-      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
-    );
-    return game ? game.league : activeLeague;
-  };
-
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  // Handle search form submit
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   // Navigation functions
   const navigateToHome = () => {

@@ -7,19 +7,27 @@ import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
+import { SearchProvider, useSearch } from './contexts/SearchContext';
 
 // Main Dashboard Component
 function Dashboard({ activeTab, setActiveTab }) {
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activePage, setActivePage] = useState('home');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load games when component mounts or tab changes
   useEffect(() => {
@@ -152,65 +160,6 @@ function Dashboard({ activeTab, setActiveTab }) {
 
   const currentWeek = getCurrentWeek(currentGames);
 
-  // Generate search suggestions
-  const generateSuggestions = (query) => {
-    if (!query || query.length < 2) {
-      setSearchSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const allGames = [...nflGames, ...ncaaGames];
-    const teamNames = new Set();
-    
-    allGames.forEach(game => {
-      if (game.homeTeam && game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.homeTeam);
-      }
-      if (game.awayTeam && game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.awayTeam);
-      }
-    });
-
-    const suggestions = Array.from(teamNames).slice(0, 5);
-    setSearchSuggestions(suggestions);
-    setShowSuggestions(suggestions.length > 0);
-  };
-
-  // Handle search input change
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  // Find team league from games data
-  const findTeamLeague = (teamName) => {
-    const allGames = [...nflGames, ...ncaaGames];
-    const game = allGames.find(game => 
-      (game.homeTeam && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())) ||
-      (game.awayTeam && game.awayTeam.toLowerCase().includes(teamName.toLowerCase()))
-    );
-    return game ? game.league : 'nfl'; // Default to NFL if not found
-  };
-
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  // Handle search form submit (Enter key)
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   // Navigation functions
   const navigateToStats = () => {
@@ -534,12 +483,14 @@ function App() {
   return (
     <DarkModeProvider>
       <Router>
-        <Routes>
-          <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
-          <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-          <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-          <Route path="/team" element={<TeamPage />} />
-        </Routes>
+        <SearchProvider>
+          <Routes>
+            <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
+            <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+            <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+            <Route path="/team" element={<TeamPage />} />
+          </Routes>
+        </SearchProvider>
       </Router>
     </DarkModeProvider>
   );

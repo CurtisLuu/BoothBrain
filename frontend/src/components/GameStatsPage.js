@@ -3,6 +3,7 @@ import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Mo
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useSearch } from '../contexts/SearchContext';
 
 // All Statistics Section Component
 const AllStatisticsSection = ({ selectedGame, teamStats }) => {
@@ -390,6 +391,16 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [selectedGame, setSelectedGame] = useState(null);
   const [allGames, setAllGames] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -398,9 +409,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [activePage, setActivePage] = useState('stats');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
@@ -528,61 +536,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     }
   };
 
-  // Search functionality
-  const generateSuggestions = (query) => {
-    if (!query || query.length < 2) {
-      setSearchSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const teamNames = new Set();
-    
-    allGames.forEach(game => {
-      if (game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.homeTeam);
-      }
-      if (game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.awayTeam);
-      }
-    });
-
-    const suggestions = Array.from(teamNames).slice(0, 5);
-    setSearchSuggestions(suggestions);
-    setShowSuggestions(suggestions.length > 0);
-  };
-
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  const findTeamLeague = (teamName) => {
-    const game = allGames.find(game => 
-      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
-    );
-    return game ? game.league : 'nfl';
-  };
-
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    // Don't clear saved game when navigating to team page - we want to return to the same game
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      // Don't clear saved game when navigating to team page - we want to return to the same game
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   const navigateToHome = () => {
     setActivePage('home');
