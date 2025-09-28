@@ -1,4 +1,4 @@
-# 🚀 How to Run Football AI
+# 🚀 How to Run BoothBrain
 
 ## ⚡ Quick Start
 
@@ -55,7 +55,7 @@ python main.py
 ## 📁 Project Structure
 
 ```
-football.ai/
+BoothBrain/
 ├── frontend/          # React app (run npm start here)
 ├── backend/           # Python API (run python main.py here)
 ├── start.bat          # Windows startup script

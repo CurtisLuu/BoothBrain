@@ -5,21 +5,31 @@ import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
+import CedarChat from './components/CedarChat';
+import RadialMenu from './components/RadialMenu';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
+import { SearchProvider, useSearch } from './contexts/SearchContext';
 
 // Main Dashboard Component
 function Dashboard({ activeTab, setActiveTab }) {
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activePage, setActivePage] = useState('home');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load games when component mounts or tab changes
   useEffect(() => {
@@ -152,65 +162,6 @@ function Dashboard({ activeTab, setActiveTab }) {
 
   const currentWeek = getCurrentWeek(currentGames);
 
-  // Generate search suggestions
-  const generateSuggestions = (query) => {
-    if (!query || query.length < 2) {
-      setSearchSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const allGames = [...nflGames, ...ncaaGames];
-    const teamNames = new Set();
-    
-    allGames.forEach(game => {
-      if (game.homeTeam && game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.homeTeam);
-      }
-      if (game.awayTeam && game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.awayTeam);
-      }
-    });
-
-    const suggestions = Array.from(teamNames).slice(0, 5);
-    setSearchSuggestions(suggestions);
-    setShowSuggestions(suggestions.length > 0);
-  };
-
-  // Handle search input change
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  // Find team league from games data
-  const findTeamLeague = (teamName) => {
-    const allGames = [...nflGames, ...ncaaGames];
-    const game = allGames.find(game => 
-      (game.homeTeam && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())) ||
-      (game.awayTeam && game.awayTeam.toLowerCase().includes(teamName.toLowerCase()))
-    );
-    return game ? game.league : 'nfl'; // Default to NFL if not found
-  };
-
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  // Handle search form submit (Enter key)
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   // Navigation functions
   const navigateToStats = () => {
@@ -243,7 +194,7 @@ function Dashboard({ activeTab, setActiveTab }) {
                   <Trophy className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-black dark:text-white">Football AI</h1>
+                  <h1 className="text-xl font-bold text-black dark:text-white">BoothBrain</h1>
                   <p className="text-sm text-gray-700 dark:text-gray-300">Powered by AI Analytics</p>
                 </div>
               </div>
@@ -361,7 +312,7 @@ function Dashboard({ activeTab, setActiveTab }) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg">
-            AI-Powered Football Analytics
+            AI-Powered Sports Analytics
           </h2>
           <p className="text-xl text-white mb-8 max-w-3xl mx-auto opacity-90">
             Get instant insights, stats, and fun facts about your favorite {activeTab.toUpperCase()} games. 
@@ -390,7 +341,7 @@ function Dashboard({ activeTab, setActiveTab }) {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
               <h3 className="text-2xl font-bold text-black dark:text-white">
-                Recent Football Games for Week {currentWeek}
+                Recent Games for Week {currentWeek}
               </h3>
               {/* League Tabs */}
               <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -482,10 +433,10 @@ function Dashboard({ activeTab, setActiveTab }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold text-black dark:text-white mb-4">
-              Why Choose Football AI?
+              Why Choose BoothBrain?
             </h3>
             <p className="text-lg text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">
-              Experience football like never before with our AI-powered platform
+              Experience sports like never before with our AI-powered platform
             </p>
           </div>
 
@@ -534,12 +485,16 @@ function App() {
   return (
     <DarkModeProvider>
       <Router>
-        <Routes>
-          <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
-          <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-          <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-          <Route path="/team" element={<TeamPage />} />
-        </Routes>
+        <SearchProvider>
+          <Routes>
+            <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
+            <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+            <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+            <Route path="/team" element={<TeamPage />} />
+          </Routes>
+          {/* Global Cedar Chat - Persistent across all pages */}
+          <CedarChat />
+        </SearchProvider>
       </Router>
     </DarkModeProvider>
   );

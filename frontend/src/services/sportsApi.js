@@ -2,6 +2,7 @@
 class SportsApiService {
   constructor() {
     // Use the correct ESPN API endpoints based on the documentation
+    this.apiBaseUrl = 'http://localhost:8000';
     this.espnBaseUrl = 'https://site.api.espn.com/apis/site/v2/sports';
     this.espnCoreUrl = 'https://sports.core.api.espn.com/v2/sports/football/leagues';
     this.nflUrl = `${this.espnBaseUrl}/football/nfl/scoreboard`;

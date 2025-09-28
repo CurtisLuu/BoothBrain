@@ -1,6 +1,6 @@
-# 🎨 Frontend - Football AI
+# 🎨 Frontend - BoothBrain
 
-React-based frontend application for the Football AI sports analytics platform.
+React-based frontend application for the BoothBrain sports analytics platform.
 
 ## 🚀 Quick Start
 
