@@ -1,6 +1,6 @@
 # 🏈 BoothBrain - Advanced Sports Analytics Platform
 
-A comprehensive AI-powered sports analytics platform featuring real-time game analysis, team management, interactive chat, and advanced PDF editing capabilities.
+A comprehensive AI-powered sports analytics platform featuring real-time game analysis, support for announcer reports, and a personal AI football analyst willing to help at any time.
 
 ## 🚀 Features
 
@@ -190,41 +190,18 @@ backend/start_backend.bat
 - **Professional analysis**: AI acts as sports analyst
 - **Current season focus**: Only latest data
 
-### **PDF Editor Usage**
-
-#### **PDF.js Editor (Recommended)**
-1. Go to the **Import** tab
-2. Select **"PDF.js Editor"** option
-3. Upload a PDF file
-4. Click **"Edit PDF"**
-5. Use the toolbar to:
-   - Draw with the pen tool
-   - Add text annotations
-   - Create shapes and highlights
-   - Navigate between pages
-6. Save or download your edited PDF
-
-#### **Backend Editor**
-1. Ensure the Python backend is running
-2. Select **"Backend Editor"** option
-3. Upload and edit PDFs with server-side processing
-
 ## 🔧 Technology Stack
 
 ### **Frontend**
 - **React 18** - UI framework
 - **React Router** - Navigation
 - **Tailwind CSS** - Styling
-- **PDF.js** - PDF rendering and editing
 - **Lucide React** - Icons
-- **html2pdf.js** - PDF generation
 - **Context API** - State management
 - **Custom Hooks** - Reusable logic
 
 ### **Backend**
 - **FastAPI** - Python web framework
-- **PyMuPDF (fitz)** - PDF processing
-- **pdf2image** - Alternative PDF processing
 - **Pillow** - Image processing
 - **Uvicorn** - ASGI server
 - **Google Gemini AI** - AI chat integration
