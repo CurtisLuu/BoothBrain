@@ -8,6 +8,7 @@ import SchedulePage from './components/SchedulePage';
 import CedarChat from './components/CedarChat';
 import RadialMenu from './components/RadialMenu';
 import PDFTextEditor from './components/PDFTextEditor';
+import GameReportEditor from './components/GameReportEditor';
 import footballApi from './services/footballApi';
 import chatApi from './services/chatApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
@@ -571,8 +572,9 @@ function App() {
             <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
             <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
             <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-            <Route path="/team" element={<TeamPage />} />
-            <Route path="/pdf-editor/:fileId" element={<PDFTextEditor />} />
+                    <Route path="/team" element={<TeamPage />} />
+                    <Route path="/pdf-editor/:fileId" element={<PDFTextEditor />} />
+                    <Route path="/game-report-editor" element={<GameReportEditor />} />
           </Routes>
         </SearchProvider>
       </Router>

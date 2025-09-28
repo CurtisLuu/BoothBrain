@@ -736,6 +736,21 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     }
   };
 
+  // Export comprehensive game report
+  const handleExportReport = async () => {
+    if (!selectedGame) {
+      alert('Please select a game to export');
+      return;
+    }
+
+    // Navigate to the game report editor page
+    navigate('/game-report-editor', {
+      state: {
+        game: selectedGame
+      }
+    });
+  };
+
   // Effect to load game data when selectedGame changes
   useEffect(() => {
     if (selectedGame && selectedGame.id) {
@@ -1619,14 +1634,12 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               </div>
                             </div>
                             <button
-                              onClick={() => {
-                                alert('PDF export functionality has been removed. Game statistics are available for viewing only.');
-                              }}
+                              onClick={handleExportReport}
                               className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                              title="Export functionality removed"
+                              title="Generate comprehensive game report"
                             >
                               <Download className="w-4 h-4" />
-                              <span className="hidden sm:inline">Export (Disabled)</span>
+                              <span className="hidden sm:inline">Export Report</span>
                             </button>
                           </div>
                         </div>

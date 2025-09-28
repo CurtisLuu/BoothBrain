@@ -100,6 +100,11 @@ class PDFGeminiRequest(BaseModel):
     text: str
     prompt: str = ""
 
+class GameReportRequest(BaseModel):
+    game: dict
+    league: str = "nfl"
+    page_length: int = 2  # Default to 2 pages
+
 class PDFGenerationRequest(BaseModel):
     file_id: str
     edited_text: str
@@ -124,7 +129,11 @@ class ChatResponse(BaseModel):
     status: str = "success"
 
 # File storage in memory
+# In-memory file storage
 file_storage = {}
+
+# In-memory cache for game reports
+game_report_cache = {}
 
 # Cedar Chat storage
 chat_sessions = {}  # session_id -> list of ChatMessage
@@ -782,35 +791,47 @@ async def list_chat_sessions():
 async def process_pdf_with_gemini(request: PDFGeminiRequest):
     """Process PDF text with Gemini AI for analysis"""
     try:
-        # Check if file exists
+        # Check if file exists or if it's a game report
         if request.file_id not in file_storage:
-            raise HTTPException(status_code=404, detail="PDF file not found")
+            # If it's a game report, create a mock file info
+            if request.file_id.startswith('game-report') or request.file_id.startswith('test-game'):
+                file_info = {
+                    'filename': 'Game Report',
+                    'total_pages': 1
+                }
+            else:
+                raise HTTPException(status_code=404, detail="PDF file not found")
+        else:
+            file_info = file_storage[request.file_id]
         
-        file_info = file_storage[request.file_id]
-        
-        # Prepare the prompt for Gemini
-        base_prompt = f"""You are an AI assistant analyzing a PDF document. Please provide a helpful and detailed response to the user's question.
+        # Prepare the prompt for Gemini - enhanced for game reports
+        base_prompt = f"""You are an AI assistant analyzing a sports game report. Please provide a helpful and detailed response to the user's question.
 
 **Document Information:**
 - Filename: {file_info.get('filename', 'Unknown')}
 - File ID: {request.file_id}
 - Total Pages: {file_info.get('total_pages', 'Unknown')}
 
-**Document Content:**
+**Game Report Content:**
 {request.text}
 
 **User's Question/Request:**
-{request.prompt if request.prompt else "Please provide a comprehensive analysis of this document, including key insights, main topics, and important information."}
+{request.prompt if request.prompt else "Please provide a comprehensive analysis of this game report, including key insights, main topics, and important information."}
 
 **Instructions:**
 - Answer the user's question directly and helpfully
-- If it's a resume, highlight key skills, experiences, and achievements
-- If it's a technical document, explain the main concepts and findings
-- If it's a general document, provide insights and key takeaways
-- Be specific and reference actual content from the document
+- If this is a game report, provide detailed analysis about the teams, players, and matchup
+- Include specific player names, statistics, and team information when available
+- If asked about specific players, provide detailed information about their performance and impact
+- If asked about team strategies, analyze coaching decisions and game plans
+- If asked about predictions, provide detailed reasoning based on current data
+- Use web search to get the most current information about teams and players
+- Be specific and reference actual content from the report
+- Provide actionable insights and recommendations
+- Focus on upcoming games and what to expect
 - Format your response clearly with bullet points or sections as appropriate
 
-Please provide a detailed, helpful response:"""
+Please analyze the game report and respond to the user's request with detailed, specific information:"""
         
         # Use Gemini to analyze the text
         try:
@@ -893,11 +914,17 @@ The document contains {len(request.text.split())} words and {len(request.text.sp
 async def generate_pdf(request: PDFGenerationRequest):
     """Generate a PDF from edited text"""
     try:
+        # Check if file exists or if it's a game report
         if request.file_id not in file_storage:
-            raise HTTPException(status_code=404, detail="PDF file not found")
-        
-        file_info = file_storage[request.file_id]
-        original_filename = file_info.get('filename', 'document.pdf')
+            # For any file_id not in storage, treat as game report (more permissive)
+            file_info = {
+                'filename': 'Game Report',
+                'total_pages': 1
+            }
+            original_filename = request.filename
+        else:
+            file_info = file_storage[request.file_id]
+            original_filename = file_info.get('filename', 'document.pdf')
         
         # Create PDF in memory
         buffer = BytesIO()
@@ -974,6 +1001,309 @@ async def generate_pdf(request: PDFGenerationRequest):
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
+
+@app.post("/generate-game-report")
+async def generate_game_report(request: GameReportRequest):
+    """Generate a comprehensive game report using Gemini AI"""
+    try:
+        game = request.game
+        league = request.league
+        page_length = request.page_length
+        
+        print(f"Generating {page_length}-page report for: {game.get('away_team', 'Unknown')} vs {game.get('home_team', 'Unknown')}")
+        
+        # Create cache key for this game and page length
+        cache_key = f"{game.get('away_team', 'Unknown')}_{game.get('home_team', 'Unknown')}_{game.get('date', 'TBD')}_{page_length}pages"
+        
+        # Check cache first
+        if cache_key in game_report_cache:
+            cached_report = game_report_cache[cache_key]
+            print(f"Returning cached report for {cache_key}")
+            return {
+                "game_id": game.get('id', 'unknown'),
+                "away_team": game.get('away_team', 'Unknown'),
+                "home_team": game.get('home_team', 'Unknown'),
+                "league": league,
+                "report": cached_report,
+                "timestamp": datetime.now().isoformat(),
+                "status": "cached"
+            }
+        
+        # Dynamic prompt based on page length
+        if page_length == 1:
+            comprehensive_prompt = f"""Create a QUICK 1-page NFL game report for this UPCOMING matchup:
+
+**GAME:** {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+**DATE:** {game.get('date', 'TBD')} - UPCOMING GAME
+
+**REQUIREMENTS (BE VERY CONCISE):**
+1. **EXECUTIVE SUMMARY** (2 sentences)
+2. **KEY PLAYERS** (Top 2 per team)
+3. **PREDICTION** (1 sentence with score)
+
+**FORMATTING:**
+- Use bullet points
+- Target: 300-400 words
+- Include specific player names
+- Use web search for current info
+
+Generate this quick report now:"""
+
+        elif page_length == 2:
+            comprehensive_prompt = f"""Create a STANDARD 2-page NFL game report for this UPCOMING matchup:
+
+**GAME:** {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+**DATE:** {game.get('date', 'TBD')} - UPCOMING GAME
+
+**REQUIREMENTS:**
+1. **EXECUTIVE SUMMARY** (3 sentences)
+2. **TEAM ANALYSIS** (Brief season performance)
+3. **KEY PLAYERS** (Top 3 per team with stats)
+4. **HEAD-TO-HEAD** (Recent meetings)
+5. **PREDICTION** (Score with reasoning)
+
+**FORMATTING:**
+- Use bullet points
+- Target: 600-800 words
+- Include specific player names and stats
+- Use web search for current info
+
+Generate this standard report now:"""
+
+        elif page_length == 3:
+            comprehensive_prompt = f"""Create a DETAILED 3-page NFL game report for this UPCOMING matchup:
+
+**GAME:** {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+**DATE:** {game.get('date', 'TBD')} - UPCOMING GAME
+
+**REQUIREMENTS:**
+1. **EXECUTIVE SUMMARY** (4 sentences)
+2. **TEAM ANALYSIS** (Season performance, recent form)
+3. **KEY PLAYERS** (Top 4 per team with detailed stats)
+4. **HEAD-TO-HEAD HISTORY** (Recent meetings, rivalry)
+5. **COACHING ANALYSIS** (Brief coach profiles)
+6. **STATISTICAL BREAKDOWN** (Key team stats)
+7. **PREDICTION** (Detailed score prediction)
+
+**FORMATTING:**
+- Use bullet points and sections
+- Target: 900-1200 words
+- Include specific player names, stats, and rankings
+- Use web search for current info
+
+Generate this detailed report now:"""
+
+        elif page_length == 4:
+            comprehensive_prompt = f"""Create a COMPREHENSIVE 4-page NFL game report for this UPCOMING matchup:
+
+**GAME:** {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+**DATE:** {game.get('date', 'TBD')} - UPCOMING GAME
+
+**REQUIREMENTS:**
+1. **EXECUTIVE SUMMARY** (5 sentences)
+2. **TEAM ANALYSIS** (Season performance, recent form, rankings)
+3. **KEY PLAYERS** (Top 5 per team with detailed stats)
+4. **HEAD-TO-HEAD HISTORY** (Recent meetings, rivalry context)
+5. **COACHING ANALYSIS** (Coach profiles and strategies)
+6. **STATISTICAL BREAKDOWN** (Offense, defense, special teams)
+7. **INJURY REPORTS** (Current injury status)
+8. **PREDICTION** (Detailed analysis with score)
+
+**FORMATTING:**
+- Use bullet points and clear sections
+- Target: 1200-1600 words
+- Include specific player names, stats, rankings, and percentages
+- Use web search for current info
+
+Generate this comprehensive report now:"""
+
+        else:  # 5+ pages
+            comprehensive_prompt = f"""Create an EXTENSIVE 5+ page NFL game report for this UPCOMING matchup:
+
+**GAME:** {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+**DATE:** {game.get('date', 'TBD')} - UPCOMING GAME
+
+**REQUIREMENTS (ALL SECTIONS):**
+1. **EXECUTIVE SUMMARY** (6 sentences)
+2. **TEAM ANALYSIS** (Season performance, recent form, rankings)
+3. **KEY PLAYERS** (Top 6 per team with detailed stats)
+4. **HEAD-TO-HEAD HISTORY** (Recent meetings, rivalry context, historical moments)
+5. **COACHING ANALYSIS** (Coach profiles, philosophies, strategies)
+6. **STATISTICAL BREAKDOWN** (Offense, defense, special teams, efficiency)
+7. **INJURY REPORTS** (Current injury status, impact analysis)
+8. **RECENT NEWS** (Latest team developments)
+9. **VENUE ANALYSIS** (Stadium, weather, home field advantage)
+10. **PREDICTION** (Detailed analysis with score and confidence)
+
+**FORMATTING:**
+- Use bullet points and clear sections
+- Target: 1500-2000+ words
+- Include specific player names, stats, rankings, percentages, and dates
+- Use web search for current info
+- Be extremely detailed and comprehensive
+
+Generate this extensive report now:"""
+        
+        # Use Gemini to generate the comprehensive report
+        try:
+            print(f"Calling Gemini API for comprehensive upcoming game report")
+            
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=comprehensive_prompt,
+                config=config
+            )
+            
+            report = response.text if hasattr(response, 'text') else str(response)
+            print(f"Generated report length: {len(report)} characters")
+            
+            # Cache the report
+            game_report_cache[cache_key] = report
+            print(f"Cached report for {cache_key}")
+            
+            return {
+                "game_id": game.get('id', 'unknown'),
+                "away_team": game.get('away_team', 'Unknown'),
+                "home_team": game.get('home_team', 'Unknown'),
+                "league": league,
+                "report": report,
+                "timestamp": datetime.now().isoformat(),
+                "status": "success"
+            }
+            
+        except Exception as gemini_error:
+            print(f"Gemini API error: {gemini_error}")
+            
+            # Enhanced fallback report with more detail
+            fallback_report = f"""COMPREHENSIVE GAME REPORT - UPCOMING GAME
+=====================================
+
+MATCHUP: {game.get('away_team', 'Away Team')} vs {game.get('home_team', 'Home Team')}
+DATE: {game.get('date', 'TBD')}
+TIME: {game.get('time', 'TBD')}
+STATUS: {game.get('status', 'Scheduled')} - UPCOMING GAME
+LEAGUE: {league.upper()}
+
+EXECUTIVE SUMMARY
+=================
+This is an UPCOMING {league.upper()} matchup featuring {game.get('away_team', 'Away Team')} taking on {game.get('home_team', 'Home Team')}. This game is scheduled for {game.get('date', 'TBD')} and promises to be an exciting contest between two competitive teams.
+
+TEAM ANALYSIS
+=============
+Both teams enter this upcoming game with their own strengths and challenges. The {game.get('away_team', 'Away Team')} will look to establish their game plan early, while the {game.get('home_team', 'Home Team')} will aim to use their home field advantage.
+
+KEY PLAYERS TO WATCH
+===================
+- Monitor the performance of key offensive and defensive players
+- Watch for impact plays from special teams
+- Focus on quarterback performance and decision-making
+- Look for breakout performances from emerging players
+
+STATISTICAL BREAKDOWN
+====================
+Detailed statistics will be available closer to game time. Both teams will look to establish their preferred style of play early in the contest.
+
+PREDICTION
+==========
+This upcoming game could go either way depending on execution, coaching decisions, and key plays. The team that minimizes mistakes and capitalizes on opportunities will likely emerge victorious.
+
+NOTE: This is a basic report template. For detailed analysis with current statistics, player information, and comprehensive insights, please use the Gemini AI Analysis feature on the right panel.
+
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            
+            return {
+                "game_id": game.get('id', 'unknown'),
+                "away_team": game.get('away_team', 'Unknown'),
+                "home_team": game.get('home_team', 'Unknown'),
+                "league": league,
+                "report": fallback_report,
+                "timestamp": datetime.now().isoformat(),
+                "status": "fallback",
+                "error": "Gemini API temporarily unavailable"
+            }
+        
+    except Exception as e:
+        print(f"Error generating game report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating game report: {str(e)}")
+
+@app.post("/analyze-game-report")
+async def analyze_game_report(request: dict):
+    """Analyze game report text with Gemini AI"""
+    try:
+        text = request.get('text', '')
+        prompt = request.get('prompt', '')
+        
+        if not text or not prompt:
+            raise HTTPException(status_code=400, detail="Both text and prompt are required")
+        
+        print(f"Analyzing game report with prompt: {prompt}")
+        
+        # Enhanced prompt for game report analysis
+        analysis_prompt = f"""You are a professional sports analyst. Please analyze this game report and answer the user's question.
+
+**Game Report Content:**
+{text}
+
+**User's Question:**
+{prompt}
+
+**Instructions:**
+- Provide detailed analysis about the teams, players, and matchup
+- Include specific player names, statistics, and team information when available
+- Use web search to get the most current information about teams and players
+- Be specific and reference actual content from the report
+- Provide actionable insights and recommendations
+- Focus on upcoming games and what to expect
+- Format your response clearly with bullet points or sections as appropriate
+
+Please provide a detailed analysis:"""
+        
+        # Use Gemini to analyze the text
+        try:
+            print(f"Calling Gemini API for game report analysis")
+            
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=analysis_prompt,
+                config=config
+            )
+            
+            analysis = response.text if hasattr(response, 'text') else str(response)
+            print(f"Gemini analysis length: {len(analysis)}")
+            
+            return {
+                "analysis": analysis,
+                "timestamp": datetime.now().isoformat(),
+                "status": "success"
+            }
+            
+        except Exception as gemini_error:
+            print(f"Gemini API error: {gemini_error}")
+            
+            # Fallback response
+            fallback_response = f"""I apologize, but I encountered an error while processing your request. Here's what I can tell you about the game report:
+
+**Analysis:**
+- This appears to be a game report document
+- The content includes information about teams and matchups
+- For specific questions about players or teams, please try rephrasing your question
+
+**Error Details:**
+{str(gemini_error)}
+
+Please try asking a more specific question about the teams, players, or game details."""
+            
+            return {
+                "analysis": fallback_response,
+                "timestamp": datetime.now().isoformat(),
+                "status": "fallback",
+                "error": "Gemini API temporarily unavailable"
+            }
+            
+    except Exception as e:
+        print(f"Error analyzing game report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error analyzing game report: {str(e)}")
 
 @app.get("/pdf-preview/{file_id}")
 async def get_pdf_preview(file_id: str):
