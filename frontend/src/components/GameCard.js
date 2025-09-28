@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, TrendingUp } from 'lucide-react';
+import RadialMenu from './RadialMenu';
 
 const GameCard = ({ game, league }) => {
   const navigate = useNavigate();
+  const [radialMenu, setRadialMenu] = useState({ isOpen: false, position: { x: 0, y: 0 } });
   
   const getLeagueBg = (league) => {
     return league === 'nfl' ? 'bg-football-nfl' : 'bg-football-ncaa';
@@ -44,8 +46,46 @@ const GameCard = ({ game, league }) => {
     navigate('/stats', { state: { game: { ...game, league } } });
   };
 
+  const handleRightClick = (e) => {
+    e.preventDefault();
+    setRadialMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  };
+
+  const handleRadialMenuClose = () => {
+    setRadialMenu({ isOpen: false, position: { x: 0, y: 0 } });
+  };
+
+  const handleRadialMenuSelect = (option) => {
+    console.log('Selected option:', option, 'for game:', game);
+    // Handle different radial menu options
+    switch (option) {
+      case 'summary':
+        // Navigate to game summary
+        navigate('/stats', { state: { game: { ...game, league } } });
+        break;
+      case 'players':
+        // Navigate to players page
+        navigate('/stats', { state: { game: { ...game, league }, tab: 'players' } });
+        break;
+      case 'highlights':
+        // Navigate to highlights
+        navigate('/stats', { state: { game: { ...game, league }, tab: 'highlights' } });
+        break;
+      case 'stats':
+        // Navigate to stats
+        navigate('/stats', { state: { game: { ...game, league }, tab: 'stats' } });
+        break;
+      default:
+        break;
+    }
+    handleRadialMenuClose();
+  };
+
   return (
-    <div className="game-card">
+    <div className="game-card" onContextMenu={handleRightClick}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <div className={`w-3 h-3 rounded-full ${getLeagueBg(league)}`}></div>
@@ -110,6 +150,15 @@ const GameCard = ({ game, league }) => {
           </button>
         </div>
       </div>
+
+      {/* Radial Menu */}
+      <RadialMenu
+        isOpen={radialMenu.isOpen}
+        position={radialMenu.position}
+        onClose={handleRadialMenuClose}
+        onOptionSelect={handleRadialMenuSelect}
+        game={game}
+      />
     </div>
   );
 };

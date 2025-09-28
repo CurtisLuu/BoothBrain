@@ -5,6 +5,8 @@ import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
+import CedarChat from './components/CedarChat';
+import RadialMenu from './components/RadialMenu';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
 import { SearchProvider, useSearch } from './contexts/SearchContext';
@@ -472,6 +474,8 @@ function Dashboard({ activeTab, setActiveTab }) {
         </div>
       </section>
 
+      {/* Cedar Chat Component */}
+      <CedarChat />
     </div>
   );
 }

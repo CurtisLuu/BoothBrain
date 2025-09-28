@@ -121,13 +121,14 @@ const CedarChat = () => {
 
     try {
       const data = await chatApi.sendMessage(userMessage.content, sessionId, 'general');
+      console.log('API Response:', data); // Debug log
       
-              const assistantMessage = {
-                id: Date.now() + 1,
-                role: 'assistant',
-                content: data.message.content,
-                timestamp: data.message.timestamp
-              };
+      const assistantMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: data.answer || data.message || 'No response received',
+        timestamp: new Date().toISOString()
+      };
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
@@ -442,6 +443,64 @@ const CedarChat = () => {
           </div>
         )}
 
+        {/* Input Area - Different layout for collapsed vs expanded */}
+        {!isExpanded ? (
+          // Collapsed state - input at top
+          <div className="p-3">
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  onFocus={() => !isExpanded && setIsExpanded(true)}
+                  placeholder="Ask a question..."
+                  className="w-full bg-gray-800 dark:bg-gray-700 border border-gray-800 dark:border-gray-700 rounded-2xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-500/50"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              {/* Send Button */}
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isLoading}
+                className="p-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-full transition-colors"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Expanded state - input at bottom
+          <div className="p-3 border-t border-gray-700 dark:border-gray-600">
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask a question..."
+                  className="w-full bg-gray-800 dark:bg-gray-700 border border-gray-800 dark:border-gray-700 rounded-2xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-500/50"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              {/* Send Button */}
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isLoading}
+                className="p-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-full transition-colors"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Resize Handles - Only shown when expanded */}
         {isExpanded && (
           <>
@@ -490,34 +549,6 @@ const CedarChat = () => {
             />
           </>
         )}
-
-        {/* Input Area */}
-        <div className="p-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                onFocus={() => !isExpanded && setIsExpanded(true)}
-                placeholder="Ask a question..."
-                className="w-full bg-gray-800 dark:bg-gray-700 border border-gray-800 dark:border-gray-700 rounded-2xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-500/50"
-                disabled={isLoading}
-              />
-            </div>
-            
-            {/* Send Button */}
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="p-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-full transition-colors"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       </div>
     </div>
     </>
