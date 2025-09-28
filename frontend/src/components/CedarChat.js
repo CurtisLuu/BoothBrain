@@ -17,6 +17,8 @@ const CedarChat = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [messageQueue, setMessageQueue] = useState([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -25,6 +27,49 @@ const CedarChat = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Process message queue
+  useEffect(() => {
+    const processQueue = async () => {
+      if (messageQueue.length === 0 || isProcessingQueue) return;
+      
+      setIsProcessingQueue(true);
+      const messageToProcess = messageQueue[0];
+      
+      try {
+        // Don't add user message again - it's already added immediately
+        setIsLoading(true);
+
+        const data = await chatApi.sendMessage(messageToProcess.content, sessionId, 'general');
+        console.log('API Response:', data);
+        
+        const assistantMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: data.answer || data.message || 'No response received',
+          timestamp: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+      } catch (error) {
+        console.error('Error sending message:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+        // Remove the processed message from queue
+        setMessageQueue(prev => prev.slice(1));
+        setIsProcessingQueue(false);
+      }
+    };
+
+    processQueue();
+  }, [messageQueue, isProcessingQueue, sessionId]);
 
   // Focus input when expanded and set initial position
   useEffect(() => {
@@ -52,6 +97,38 @@ const CedarChat = () => {
     } else {
       createNewSession();
     }
+  }, []);
+
+  // Listen for RadialMenu chat expansion events
+  useEffect(() => {
+    const handleChatExpand = (event) => {
+      const { message, game } = event.detail;
+      if (message) {
+        // Set the input value and expand the chat
+        setInputValue(message);
+        setIsExpanded(true);
+        
+        // Immediately add user message to chat for instant feedback
+        const userMessage = {
+          id: Date.now(),
+          role: 'user',
+          content: message.trim(),
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Add to queue for API processing
+        setMessageQueue(prev => [...prev, { 
+          content: message.trim(), 
+          timestamp: new Date().toISOString() 
+        }]);
+      }
+    };
+
+    window.addEventListener('cedar-chat-expand', handleChatExpand);
+    return () => {
+      window.removeEventListener('cedar-chat-expand', handleChatExpand);
+    };
   }, []);
 
   // Resize functionality
@@ -142,44 +219,25 @@ const CedarChat = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+  const handleSendMessage = () => {
+    if (!inputValue.trim()) return;
 
+    // Immediately add user message to chat for instant feedback
     const userMessage = {
       id: Date.now(),
       role: 'user',
       content: inputValue.trim(),
       timestamp: new Date().toISOString()
     };
-
     setMessages(prev => [...prev, userMessage]);
+
+    // Add message to queue for API processing
+    setMessageQueue(prev => [...prev, { 
+      content: inputValue.trim(), 
+      timestamp: new Date().toISOString() 
+    }]);
+    
     setInputValue('');
-    setIsLoading(true);
-
-    try {
-      const data = await chatApi.sendMessage(userMessage.content, sessionId, 'general');
-      console.log('API Response:', data); // Debug log
-      
-      const assistantMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: data.answer || data.message || 'No response received',
-        timestamp: new Date().toISOString()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again later.",
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleKeyPress = (e) => {
@@ -201,13 +259,23 @@ const CedarChat = () => {
       await chatApi.clearChat(sessionId);
       setMessages([]);
       setInputValue(''); // Clear input as well
+      setMessageQueue([]); // Clear the message queue
+      setIsProcessingQueue(false); // Reset processing state
       console.log('Chat cleared successfully');
     } catch (error) {
       console.error('Error clearing chat:', error);
       // Still clear locally even if backend fails
       setMessages([]);
       setInputValue('');
+      setMessageQueue([]);
+      setIsProcessingQueue(false);
     }
+  };
+
+  const clearQueue = () => {
+    setMessageQueue([]);
+    setIsProcessingQueue(false);
+    setIsLoading(false);
   };
 
   const copyMessage = (content) => {
@@ -470,6 +538,26 @@ const CedarChat = () => {
                 aria-label="Close"
               >
                 <X className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Queue Status - Only shown when expanded and there are queued messages */}
+        {isExpanded && messageQueue.length > 0 && (
+          <div className={`px-4 py-2 border-b ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${isProcessingQueue ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500'}`}></div>
+                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {isProcessingQueue ? 'Processing...' : `${messageQueue.length} message${messageQueue.length === 1 ? '' : 's'} in queue`}
+                </span>
+              </div>
+              <button
+                onClick={clearQueue}
+                className={`text-xs px-2 py-1 rounded ${isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} transition-colors`}
+              >
+                Clear Queue
               </button>
             </div>
           </div>

@@ -4,6 +4,304 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
 import { useSearch } from '../contexts/SearchContext';
+import RadialMenu from './RadialMenu';
+
+// Comprehensive Stats Section Component (Gemini-powered)
+const ComprehensiveStatsSection = ({ selectedGame }) => {
+  const [comprehensiveStats, setComprehensiveStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (selectedGame && selectedGame.id) {
+      loadComprehensiveStats();
+    }
+  }, [selectedGame]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadComprehensiveStats = async () => {
+    console.log('🤖 ComprehensiveStatsSection: loadComprehensiveStats called');
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('📊 Loading comprehensive stats for game:', selectedGame.id);
+      
+      if (selectedGame.id && selectedGame.awayTeam && selectedGame.homeTeam) {
+        const stats = await footballApi.getComprehensiveGameStatsAndRoster(
+          selectedGame.id, 
+          selectedGame.awayTeam, 
+          selectedGame.homeTeam, 
+          selectedGame.league || 'nfl',
+          selectedGame.date
+        );
+        
+        console.log('🤖 Comprehensive stats from Gemini:', stats);
+        setComprehensiveStats(stats);
+      } else {
+        console.log('⚠️ Missing game data for comprehensive stats');
+        setError('Missing game information');
+      }
+    } catch (err) {
+      console.error('💥 Error loading comprehensive stats:', err);
+      setError('Failed to load comprehensive statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-300">Loading comprehensive statistics from Gemini AI...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="text-center py-12">
+          <div className="text-red-500 mb-4">⚠️ {error}</div>
+          <button 
+            onClick={loadComprehensiveStats}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!comprehensiveStats) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="text-center py-12">
+          <BarChart3 className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">
+            No Comprehensive Stats Available
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            Comprehensive statistics will appear here when available
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Game Info */}
+      <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            {comprehensiveStats.gameInfo?.awayTeam} vs {comprehensiveStats.gameInfo?.homeTeam}
+          </h3>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            {comprehensiveStats.gameInfo?.status} • {comprehensiveStats.gameInfo?.venue}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-center">
+          <div>
+            <div className="text-3xl font-bold text-primary-600">
+              {comprehensiveStats.teamStats?.awayTeam?.score || 0}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              {comprehensiveStats.gameInfo?.awayTeam}
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-primary-600">
+              {comprehensiveStats.teamStats?.homeTeam?.score || 0}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              {comprehensiveStats.gameInfo?.homeTeam}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Statistics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {comprehensiveStats.gameInfo?.awayTeam} Statistics
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.awayTeam?.totalYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Total Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.awayTeam?.passingYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Passing Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.awayTeam?.rushingYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Rushing Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.awayTeam?.firstDowns || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">First Downs</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {comprehensiveStats.gameInfo?.homeTeam} Statistics
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.homeTeam?.totalYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Total Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.homeTeam?.passingYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Passing Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.homeTeam?.rushingYards || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Rushing Yards</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="text-2xl font-bold text-primary-600">
+                {comprehensiveStats.teamStats?.homeTeam?.firstDowns || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">First Downs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Key Players */}
+      {(comprehensiveStats.keyPlayers?.awayTeam?.length > 0 || comprehensiveStats.keyPlayers?.homeTeam?.length > 0) && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <Award className="w-5 h-5 mr-2 text-primary-600" />
+            Key Players
+          </h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {comprehensiveStats.keyPlayers?.awayTeam?.length > 0 && (
+              <div>
+                <h5 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  {comprehensiveStats.gameInfo?.awayTeam}
+                </h5>
+                <div className="space-y-2">
+                  {comprehensiveStats.keyPlayers.awayTeam.map((player, index) => (
+                    <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {player.name} #{player.jersey}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-300">
+                            {player.position}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-primary-600">
+                            {player.keyStats}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {player.impact}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {comprehensiveStats.keyPlayers?.homeTeam?.length > 0 && (
+              <div>
+                <h5 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  {comprehensiveStats.gameInfo?.homeTeam}
+                </h5>
+                <div className="space-y-2">
+                  {comprehensiveStats.keyPlayers.homeTeam.map((player, index) => (
+                    <div key={index} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {player.name} #{player.jersey}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-300">
+                            {player.position}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-primary-600">
+                            {player.keyStats}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {player.impact}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Game Highlights */}
+      {comprehensiveStats.gameHighlights?.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <Trophy className="w-5 h-5 mr-2 text-primary-600" />
+            Game Highlights
+          </h4>
+          <div className="space-y-3">
+            {comprehensiveStats.gameHighlights.map((highlight, index) => (
+              <div key={index} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                <div className="text-sm font-medium text-primary-600 mr-3">
+                  Q{highlight.quarter} {highlight.time}
+                </div>
+                <div className="flex-1">
+                  <div className="text-gray-900 dark:text-white">
+                    {highlight.description}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {highlight.team}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Last Updated */}
+      {comprehensiveStats.lastUpdated && (
+        <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+          Last updated: {new Date(comprehensiveStats.lastUpdated).toLocaleString()}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // All Statistics Section Component
 const AllStatisticsSection = ({ selectedGame, teamStats }) => {
@@ -26,29 +324,52 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
       console.log('📊 Loading player statistics for game:', selectedGame.id);
       console.log('🎮 Game details:', selectedGame);
       
-      // Try to get real game summary from ESPN API
-      let gameSummary = null;
+      // Try to get comprehensive game stats and roster from Gemini AI
+      let comprehensiveStats = null;
       let realPlayerStats = [];
       
-      // Check if we have a valid event ID for ESPN API
-      if (selectedGame.id && selectedGame.league) {
+      // Check if we have a valid game ID and teams
+      if (selectedGame.id && selectedGame.awayTeam && selectedGame.homeTeam) {
+        try {
+          console.log(`🔍 Attempting to fetch comprehensive stats from Gemini AI for ${selectedGame.awayTeam} vs ${selectedGame.homeTeam}`);
+          comprehensiveStats = await footballApi.getComprehensiveGameStatsAndRoster(
+            selectedGame.id, 
+            selectedGame.awayTeam, 
+            selectedGame.homeTeam, 
+            selectedGame.league || 'nfl',
+            selectedGame.date
+          );
+          console.log('🤖 Comprehensive stats from Gemini:', comprehensiveStats);
+          
+          if (comprehensiveStats && comprehensiveStats.roster) {
+            // Combine both teams' rosters
+            const awayTeamRoster = comprehensiveStats.roster.awayTeam || [];
+            const homeTeamRoster = comprehensiveStats.roster.homeTeam || [];
+            realPlayerStats = [...awayTeamRoster, ...homeTeamRoster];
+            console.log('✅ Real player stats found from Gemini:', realPlayerStats.length);
+            console.log('👥 Sample real players:', realPlayerStats.slice(0, 3));
+          } else {
+            console.log('⚠️ No roster found in comprehensive stats');
+          }
+        } catch (geminiError) {
+          console.warn('❌ Gemini API call failed, trying ESPN API fallback:', geminiError);
+          
+          // Fallback to ESPN API
         try {
           console.log(`🔍 Attempting to fetch game summary for event ${selectedGame.id} (${selectedGame.league})`);
-          gameSummary = await footballApi.getGameSummary(selectedGame.id, selectedGame.league);
-          console.log('📈 Game summary from API:', gameSummary);
+            const gameSummary = await footballApi.getGameSummary(selectedGame.id, selectedGame.league);
+            console.log('📈 Game summary from ESPN API:', gameSummary);
           
           if (gameSummary && gameSummary.players) {
             realPlayerStats = gameSummary.players;
-            console.log('✅ Real player stats found:', realPlayerStats.length);
-            console.log('👥 Sample real players:', realPlayerStats.slice(0, 3));
-          } else {
-            console.log('⚠️ No players found in game summary');
+              console.log('✅ Real player stats found from ESPN:', realPlayerStats.length);
           }
-        } catch (apiError) {
-          console.warn('❌ API call failed, falling back to mock data:', apiError);
+          } catch (espnError) {
+            console.warn('❌ ESPN API call also failed:', espnError);
+          }
         }
       } else {
-        console.log('⚠️ Missing game ID or league, using mock data');
+        console.log('⚠️ Missing game ID, teams, or league, using mock data');
       }
       
       // If we got real data, use it; otherwise fall back to mock data
@@ -413,6 +734,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   });
+  const [radialMenu, setRadialMenu] = useState({ isOpen: false, position: { x: 0, y: 0 } });
 
   // Get game from location state or use default
   const gameFromState = location.state?.game;
@@ -974,8 +1296,56 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const baseDetailedStats = getDetailedStats(selectedGame);
   const detailedStats = apiDetailedStats || baseDetailedStats;
 
+  // Radial Menu Handlers
+  const handleRightClick = (e) => {
+    e.preventDefault();
+    setRadialMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  };
+
+  const handleRadialMenuClose = () => {
+    setRadialMenu({ isOpen: false, position: { x: 0, y: 0 } });
+  };
+
+  const handleRadialMenuSelect = (option) => {
+    console.log('Selected option:', option, 'for game:', selectedGame);
+    // Handle different radial menu options
+    switch (option) {
+      case 'summary':
+        // Already on stats page, just scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'players':
+        // Scroll to players section
+        const playersSection = document.getElementById('players-section');
+        if (playersSection) {
+          playersSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        break;
+      case 'highlights':
+        // Scroll to highlights section (if exists)
+        const highlightsSection = document.getElementById('highlights-section');
+        if (highlightsSection) {
+          highlightsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        break;
+      case 'stats':
+        // Scroll to stats section
+        const statsSection = document.getElementById('stats-section');
+        if (statsSection) {
+          statsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        break;
+      default:
+        break;
+    }
+    handleRadialMenuClose();
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" onContextMenu={handleRightClick}>
       {/* Navigation Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1005,6 +1375,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   <span>Home</span>
                 </button>
                 <button
+                  onClick={() => setActivePage('stats')}
                   className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
                     activePage === 'stats' 
                       ? 'bg-primary-600 text-white' 
@@ -1013,6 +1384,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 >
                   <BarChart3 className="w-4 h-4" />
                   <span>Stats</span>
+                </button>
+                <button
+                  onClick={() => setActivePage('comprehensive')}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'comprehensive' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" />
+                  <span>AI Stats</span>
                 </button>
                 <button
                   onClick={navigateToSchedule}
@@ -1633,7 +2015,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                       </div>
 
               {/* Stats Content */}
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div id="players-section" className="flex-1 p-6 overflow-y-auto">
                 {/* Scheduled Game Notice */}
                 {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') && (
                   <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -2187,7 +2569,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 </div>
 
                 {/* All Statistics Section */}
-                <div className="mb-8">
+                <div id="stats-section" className="mb-8">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
                     <Trophy className="w-6 h-6 mr-3 text-primary-600" />
                     All Statistics
@@ -2195,6 +2577,21 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   
                   <AllStatisticsSection selectedGame={selectedGame} teamStats={detailedStats?.teamStats} />
                 </div>
+
+                {/* Comprehensive Stats Section (Gemini AI) */}
+                {activePage === 'comprehensive' && (
+                  <div id="comprehensive-stats-section" className="mb-8">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                      <Trophy className="w-6 h-6 mr-3 text-primary-600" />
+                      AI-Powered Comprehensive Statistics
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">
+                      Real-time game statistics and roster information powered by Gemini AI with web search
+                    </p>
+                    
+                    <ComprehensiveStatsSection selectedGame={selectedGame} />
+                  </div>
+                )}
               </div>
 
             </>
@@ -2213,6 +2610,15 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
           )}
         </div>
       </div>
+
+      {/* Radial Menu */}
+      <RadialMenu
+        isOpen={radialMenu.isOpen}
+        position={radialMenu.position}
+        onClose={handleRadialMenuClose}
+        onOptionSelect={handleRadialMenuSelect}
+        game={selectedGame}
+      />
     </div>
   );
 };

@@ -1,37 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BarChart3, Star, Play, TrendingUp } from 'lucide-react';
+import chatApi from '../services/chatApi';
 
 const RadialMenu = ({ isOpen, position, onClose, onOptionSelect, game, isHolding = false }) => {
   const menuRef = useRef(null);
+  const [hoveredOption, setHoveredOption] = useState(null);
 
   const options = [
     {
       id: 'summary',
       label: 'Game Summary',
+      description: 'View overall game statistics and team performance',
       icon: BarChart3,
-      color: 'bg-blue-500',
-      hoverColor: 'bg-blue-600'
+      color: '#EC4899', // Pink
+      hoverColor: '#DB2777'
     },
     {
       id: 'players',
       label: 'Standout Players',
+      description: 'See top performing players and key contributors',
       icon: Star,
-      color: 'bg-yellow-500',
-      hoverColor: 'bg-yellow-600'
+      color: '#8B5CF6', // Purple
+      hoverColor: '#7C3AED'
     },
     {
       id: 'highlights',
       label: 'Highlights',
+      description: 'Watch key plays and memorable moments',
       icon: Play,
-      color: 'bg-green-500',
-      hoverColor: 'bg-green-600'
+      color: '#F59E0B', // Amber
+      hoverColor: '#D97706'
     },
     {
       id: 'stats',
       label: 'Stats',
+      description: 'Detailed team and player statistics breakdown',
       icon: TrendingUp,
-      color: 'bg-purple-500',
-      hoverColor: 'bg-purple-600'
+      color: '#06B6D4', // Cyan
+      hoverColor: '#0891B2'
     }
   ];
 
@@ -72,6 +78,48 @@ const RadialMenu = ({ isOpen, position, onClose, onOptionSelect, game, isHolding
     return null;
   }
 
+  const sendChatPrompt = async (optionId, game) => {
+    try {
+      // Get or create session ID
+      let sessionId = localStorage.getItem('cedar-chat-session');
+      if (!sessionId) {
+        const sessionData = await chatApi.createSession();
+        sessionId = sessionData.sessionId;
+        localStorage.setItem('cedar-chat-session', sessionId);
+      }
+
+      // Generate specific prompts based on the option
+      let prompt = '';
+      const gameInfo = `${game.awayTeam} vs ${game.homeTeam}`;
+      
+      switch (optionId) {
+        case 'summary':
+          prompt = `Please provide a comprehensive game summary for ${gameInfo}. Use Google search to find the latest game statistics, team performance analysis, key moments, and overall game flow. Include score updates, possession stats, and any notable events that shaped the outcome.`;
+          break;
+        case 'players':
+          prompt = `Analyze the standout players from ${gameInfo}. Use Google search to find current player statistics, performance metrics, and public opinion on key contributors. Identify the top performers on both teams and explain why they were crucial to their team's performance.`;
+          break;
+        case 'highlights':
+          prompt = `Find and describe the game-changing plays and highlights from ${gameInfo}. Use Google search to locate video highlights, key moments, spectacular plays, and turning points that defined this game. Focus on the most impactful and memorable moments.`;
+          break;
+        case 'stats':
+          prompt = `Provide detailed statistical analysis for ${gameInfo}. Use Google search to gather comprehensive team and player statistics including offensive/defensive metrics, individual player performances, team comparisons, and advanced analytics that tell the story of this game.`;
+          break;
+        default:
+          prompt = `Please provide information about ${gameInfo}.`;
+      }
+
+      // Trigger chat expansion by dispatching a custom event
+      // The chat component will handle the API call through its queue system
+      window.dispatchEvent(new CustomEvent('cedar-chat-expand', { 
+        detail: { message: prompt, game: game } 
+      }));
+      
+    } catch (error) {
+      console.error('Error sending chat prompt:', error);
+    }
+  };
+
   const handleOptionClick = (optionId) => {
     console.log('RadialMenu handleOptionClick - optionId:', optionId);
     console.log('RadialMenu handleOptionClick - game:', game);
@@ -83,10 +131,15 @@ const RadialMenu = ({ isOpen, position, onClose, onOptionSelect, game, isHolding
       return;
     }
     
-    // Call the parent handler
+    // Send the chat prompt asynchronously (non-blocking)
+    sendChatPrompt(optionId, game);
+    
+    // Call the parent handler for any additional actions
     if (onOptionSelect && typeof onOptionSelect === 'function') {
       onOptionSelect(optionId, game);
     }
+    
+    // Close the menu immediately
     onClose();
   };
 
@@ -107,63 +160,81 @@ const RadialMenu = ({ isOpen, position, onClose, onOptionSelect, game, isHolding
       ref={menuRef}
       className="fixed z-50 pointer-events-auto"
       style={{
-        left: `${position.x - 100}px`,
-        top: `${position.y - 100}px`,
+        left: `${position.x - 80}px`,
+        top: `${position.y - 80}px`,
       }}
     >
-      <div className="relative w-48 h-48">
+      <div className="relative w-64 h-64">
         {/* Central circle */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 ${
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 ${
             isHolding 
-              ? 'bg-blue-600 dark:bg-blue-400 animate-pulse' 
-              : 'bg-gray-800 dark:bg-gray-200'
+              ? 'bg-gradient-to-br from-pink-500 to-purple-600 animate-pulse' 
+              : 'bg-white dark:bg-gray-100'
           }`}>
-            <span className="text-white dark:text-gray-800 text-xs font-medium">
+            <span className={`text-sm font-bold ${
+              isHolding ? 'text-white' : 'text-gray-800 dark:text-gray-900'
+            }`}>
               {isHolding ? 'HOLD' : getTeamInitial()}
             </span>
           </div>
         </div>
 
-        {/* Menu options positioned in a circle */}
-        {options.map((option, index) => {
-          const angle = (index * 90) - 45; // Start at -45 degrees, space 90 degrees apart
-          const radians = (angle * Math.PI) / 180;
-          const radius = 60; // Distance from center
-          const x = Math.cos(radians) * radius;
-          const y = Math.sin(radians) * radius;
+        {/* Circular ring with segments */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative w-48 h-48">
+            {options.map((option, index) => {
+              const angle = (index * 90) - 45; // Start at -45 degrees
+              const radians = (angle * Math.PI) / 180;
+              const radius = 70; // Distance from center (reduced from 100)
+              const x = Math.cos(radians) * radius;
+              const y = Math.sin(radians) * radius;
 
           const IconComponent = option.icon;
 
           return (
             <div
               key={option.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                  className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
               style={{
                 left: `calc(50% + ${x}px)`,
                 top: `calc(50% + ${y}px)`,
               }}
             >
-              <button
-                onClick={() => handleOptionClick(option.id)}
-                className={`
-                  w-12 h-12 rounded-full ${option.color} hover:${option.hoverColor}
-                  flex items-center justify-center text-white shadow-lg
-                  transition-all duration-200 transform hover:scale-110
-                  group relative
-                `}
-                title={option.label}
-              >
-                <IconComponent className="w-5 h-5" />
-                
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                  {option.label}
+                  {/* Circular button */}
+                  <button
+                    onClick={() => handleOptionClick(option.id)}
+                    onMouseEnter={() => setHoveredOption(option.id)}
+                    onMouseLeave={() => setHoveredOption(null)}
+                    className={`
+                      w-12 h-12 rounded-full ${option.color} hover:${option.hoverColor}
+                      flex items-center justify-center text-white shadow-lg
+                      transition-all duration-300 transform hover:scale-110
+                      border-2 border-white dark:border-gray-200
+                    `}
+                    style={{
+                      background: `linear-gradient(135deg, ${option.color}, ${option.hoverColor})`,
+                      boxShadow: `0 6px 12px ${option.color}40, 0 0 0 1px rgba(255,255,255,0.2)`
+                    }}
+                  >
+                    <IconComponent className="w-5 h-5" />
+                  </button>
+
+                  {/* Hover tooltip */}
+                  {hoveredOption === option.id && (
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-10">
+                      <div className="font-semibold mb-0.5">{option.label}</div>
+                      <div className="text-xs text-gray-300">{option.description}</div>
+                      {/* Arrow pointing down */}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
+                    </div>
+                  )}
                 </div>
-              </button>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
+
       </div>
     </div>
   );
