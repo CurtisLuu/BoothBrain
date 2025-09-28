@@ -1,261 +1,180 @@
-# 🏈 Football AI - Advanced Sports Analytics Platform
+# Football AI - AI-Powered Football Analytics
 
-A comprehensive sports analytics platform featuring team management, game statistics, schedule tracking, and advanced PDF editing capabilities.
+A comprehensive web application that provides real-time football statistics, game analysis, and AI-powered insights for both NFL and NCAA games.
 
-## 🚀 Features
+## 🏈 Features
 
-### 📊 **Core Features**
-- **Team Management**: Comprehensive team rosters and statistics
-- **Game Statistics**: Detailed game analysis and performance metrics
-- **Schedule Management**: Interactive schedule viewing and management
-- **Dark Mode**: Full dark/light theme support
-- **Responsive Design**: Mobile-friendly interface
+- **Real-time Game Data**: Live scores, schedules, and game information from ESPN API
+- **Advanced Statistics**: Detailed player and team statistics with comprehensive analytics
+- **Team vs Team Comparison**: Head-to-head records and statistical comparisons
+- **Dark Mode Support**: Beautiful dark/light theme toggle
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
+- **Search Functionality**: Quick team search with intelligent suggestions
+- **Multi-League Support**: Both NFL and NCAA football coverage
 
-### 📄 **PDF Editor Features**
-- **Multiple PDF Processing Technologies**:
-  - **PDF.js Editor** (Frontend-only, Recommended)
-  - **Backend Editor** (Python + PyMuPDF)
-  - **Alternative Backend** (Python + pdf2image)
-- **Advanced Editing Tools**:
-  - Drawing and annotation tools
-  - Text insertion and editing
-  - Shape tools (rectangles, circles)
-  - Highlighter and markup tools
-  - Pointer/move functionality
-- **Export Capabilities**: Download edited PDFs and game statistics
+## 🚀 Quick Start
 
-## 🏗️ Project Structure
+### Prerequisites
 
-```
-football.ai/
-├── frontend/                 # React frontend application
-│   ├── src/
-│   │   ├── components/       # React components
-│   │   ├── contexts/         # React contexts (DarkMode)
-│   │   ├── services/         # API services
-│   │   └── utils/           # Utility functions
-│   ├── public/              # Static assets
-│   └── package.json         # Frontend dependencies
-├── backend/                 # Python backend services
-│   ├── main.py             # Main PyMuPDF backend
-│   ├── main_alt.py         # Alternative pdf2image backend
-│   ├── requirements.txt    # Python dependencies
-│   ├── uploads/            # PDF file storage
-│   └── start_backend.bat   # Windows startup script
-└── README.md               # This file
-```
+- **Node.js** (v16 or higher)
+- **Python** (v3.8 or higher)
+- **npm** or **yarn**
 
-## 🛠️ Installation & Setup
+### Installation & Launch
 
-### **Prerequisites**
-- Node.js (v16 or higher)
-- Python (v3.8 or higher)
-- npm or yarn
-
-### **Frontend Setup**
-
-1. **Navigate to frontend directory**:
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Start development server**:
-   ```bash
-   npm start
-   ```
-
-4. **Access the application**:
-   Open [http://localhost:3000](http://localhost:3000) in your browser
-
-### **Quick Start (All Platforms)**
+#### Option 1: Automated Launch (Recommended)
 
 **Windows:**
 ```bash
-# Double-click or run:
 start.bat
 ```
 
-**Linux/macOS:**
+**Linux/Mac:**
 ```bash
-# Make executable and run:
 chmod +x start.sh
 ./start.sh
 ```
 
-### **Backend Setup (Optional)**
+#### Option 2: Manual Launch
 
-The PDF.js editor works without a backend, but for advanced features, you can run the Python backend:
-
-#### **Option 1: PyMuPDF Backend (Port 8000)**
-
-1. **Navigate to backend directory**:
-   ```bash
-   cd backend
-   ```
-
-2. **Install Python dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Start the server**:
-   ```bash
-   python main.py
-   ```
-
-#### **Option 2: pdf2image Backend (Port 8001)**
-
-1. **Install additional dependencies**:
-   ```bash
-   pip install -r requirements_alt.txt
-   ```
-
-2. **Start the alternative server**:
-   ```bash
-   python start_alt.py
-   ```
-
-#### **Windows Quick Start**:
+**1. Start Backend Server:**
 ```bash
-# Run the batch file
-backend/start_backend.bat
+cd backend
+pip install -r requirements.txt
+python app.py
 ```
 
-## 🎯 Usage
+**2. Start Frontend Server:**
+```bash
+cd frontend
+npm install
+npm start
+```
 
-### **Getting Started**
+**3. Access the Application:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000
 
-1. **Launch the application** by running the frontend
-2. **Navigate through the tabs**:
-   - **Dashboard**: Overview and navigation
-   - **Teams**: Team management and rosters
-   - **Schedule**: Game schedules and calendar
-   - **Stats**: Game statistics and analysis
-   - **Import**: PDF upload and editing
+## 📁 Project Structure
 
-### **PDF Editor Usage**
+```
+football.ai/
+├── frontend/                 # React frontend application
+│   ├── public/              # Static assets
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── contexts/        # React context providers
+│   │   ├── services/        # API services
+│   │   ├── App.js          # Main app component
+│   │   ├── index.js        # Entry point
+│   │   └── index.css       # Global styles
+│   ├── package.json
+│   └── tailwind.config.js
+├── backend/                 # Flask backend API
+│   ├── app.py              # Main Flask application
+│   └── requirements.txt    # Python dependencies
+├── start.bat               # Windows launch script
+├── start.sh                # Linux/Mac launch script
+└── README.md
+```
 
-#### **PDF.js Editor (Recommended)**
-1. Go to the **Import** tab
-2. Select **"PDF.js Editor"** option
-3. Upload a PDF file
-4. Click **"Edit PDF"**
-5. Use the toolbar to:
-   - Draw with the pen tool
-   - Add text annotations
-   - Create shapes and highlights
-   - Navigate between pages
-6. Save or download your edited PDF
+## 🛠️ Technology Stack
 
-#### **Backend Editor**
-1. Ensure the Python backend is running
-2. Select **"Backend Editor"** option
-3. Upload and edit PDFs with server-side processing
+### Frontend
+- **React 18** - Modern React with hooks
+- **React Router** - Client-side routing
+- **Tailwind CSS** - Utility-first CSS framework
+- **Lucide React** - Beautiful icon library
+- **Context API** - State management
 
-## 🔧 Technology Stack
+### Backend
+- **Flask** - Lightweight Python web framework
+- **Flask-CORS** - Cross-origin resource sharing
+- **Requests** - HTTP library for API calls
 
-### **Frontend**
-- **React 18** - UI framework
-- **React Router** - Navigation
-- **Tailwind CSS** - Styling
-- **PDF.js** - PDF rendering and editing
-- **Lucide React** - Icons
-- **html2pdf.js** - PDF generation
+### APIs
+- **ESPN API** - Real-time sports data
+- **ESPN Core API** - Detailed statistics and team information
 
-### **Backend**
-- **FastAPI** - Python web framework
-- **PyMuPDF (fitz)** - PDF processing
-- **pdf2image** - Alternative PDF processing
-- **Pillow** - Image processing
-- **Uvicorn** - ASGI server
+## 🎯 Key Components
 
-## 📁 Key Components
+### Frontend Components
+- **Dashboard**: Main landing page with game cards
+- **GameStatsPage**: Detailed game statistics and analysis
+- **SchedulePage**: Game schedules and upcoming matches
+- **TeamPage**: Team information and rosters
+- **GameCard**: Individual game display component
 
-### **Frontend Components**
-- `App.js` - Main application component
-- `TeamPageEnhanced.js` - Team management interface
-- `SchedulePage.js` - Schedule viewing and management
-- `GameStatsPage.js` - Game statistics and analysis
-- `ImportPage.js` - PDF upload and editor selection
-- `PDFJSEditor.js` - Frontend PDF editor (PDF.js)
-- `BackendPDFEditor.js` - Backend PDF editor interface
+### Backend Endpoints
+- `GET /api/nfl/games` - NFL games data
+- `GET /api/ncaa/games` - NCAA games data
+- `GET /api/health` - Health check
 
-### **Backend Services**
-- `main.py` - PyMuPDF-based PDF processing
-- `main_alt.py` - pdf2image-based PDF processing
-- `requirements.txt` - Python dependencies
+## 🔧 Configuration
 
-## 🚨 Troubleshooting
+### Environment Variables
+Create a `.env` file in the backend directory:
+```env
+FLASK_ENV=development
+FLASK_DEBUG=True
+```
 
-### **Common Issues**
+### API Configuration
+The application uses ESPN's public APIs. No API keys are required for basic functionality.
 
-#### **PDF Editor Not Working**
-- **Solution**: Use the PDF.js editor (frontend-only)
-- **Alternative**: Ensure Python backend is running
+## 📱 Usage
 
-#### **"Orphaned Object" Error**
-- **Cause**: PyMuPDF compatibility issue with certain PDFs
-- **Solution**: Use PDF.js editor or pdf2image backend
+1. **View Games**: Browse current and upcoming NFL/NCAA games
+2. **Game Statistics**: Click "View Stats" on any game card for detailed analysis
+3. **Team Search**: Use the search bar to find specific teams
+4. **League Toggle**: Switch between NFL and NCAA games
+5. **Dark Mode**: Toggle between light and dark themes
 
-#### **Backend Connection Refused**
-- **Solution**: Start the Python backend server
-- **Check**: Ensure port 8000 or 8001 is available
+## 🚀 Deployment
 
-#### **Frontend Build Issues**
-- **Solution**: Clear cache and reinstall dependencies
-  ```bash
-  cd frontend
-  rm -rf node_modules package-lock.json
-  npm install
-  ```
+### Frontend (Netlify/Vercel)
+```bash
+cd frontend
+npm run build
+# Deploy the 'build' folder
+```
 
-## 🔄 Development
-
-### **Adding New Features**
-1. **Frontend**: Add components in `frontend/src/components/`
-2. **Backend**: Add endpoints in `backend/main.py` or `backend/main_alt.py`
-3. **Styling**: Use Tailwind CSS classes
-4. **State Management**: Use React hooks and contexts
-
-### **PDF Editor Customization**
-- **Tools**: Add new tools in the toolbar
-- **Rendering**: Modify canvas rendering logic
-- **Export**: Customize PDF export functionality
-
-## 📝 API Endpoints
-
-### **Backend API (Port 8000/8001)**
-- `GET /` - Health check
-- `POST /upload-pdf` - Upload PDF file
-- `GET /pdf-page/{file_id}/{page_num}` - Get PDF page as image
-- `POST /add-annotations` - Save annotations
-- `GET /get-annotations/{file_id}` - Retrieve annotations
-- `GET /export-pdf/{file_id}` - Export modified PDF
+### Backend (Heroku/Railway)
+```bash
+cd backend
+# Deploy with requirements.txt
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the component documentation
-3. Create an issue in the repository
+If you encounter any issues or have questions:
+
+1. Check the console for error messages
+2. Ensure all dependencies are installed
+3. Verify that both frontend and backend servers are running
+4. Check that the ESPN API is accessible
+
+## 🔮 Future Enhancements
+
+- [ ] Player statistics and performance tracking
+- [ ] Advanced analytics and predictions
+- [ ] User accounts and favorites
+- [ ] Push notifications for game updates
+- [ ] Mobile app development
+- [ ] Social features and sharing
 
 ---
 
-**Built with ❤️ for sports analytics and PDF editing**
+**Built with ❤️ for football fans everywhere**

@@ -232,7 +232,6 @@ class FootballApiService {
     }
   }
 
-
   // Get team statistics for a specific team
   async getTeamStats(teamName, league) {
     try {
@@ -297,7 +296,6 @@ class FootballApiService {
       return null;
     }
   }
-
 
   // Get team information by name
   async getTeamByName(teamName, league = 'nfl') {
