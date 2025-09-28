@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-import { Trophy, BarChart3, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Download } from 'lucide-react';
+import { Trophy, BarChart3, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Download, FileText } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -434,7 +434,7 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
       }
       
       
-
+      
     } catch (err) {
 
       console.error('💥 Error loading player statistics:', err);
@@ -1139,6 +1139,10 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
 
   const [radialMenu, setRadialMenu] = useState({ isOpen: false, position: { x: 0, y: 0 } });
 
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const [exportError, setExportError] = useState(null);
+
 
 
   // Get game from location state or use default
@@ -1350,7 +1354,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
               setAllGames(allCombinedGames);
       
       
-
+      
       // Set first game as selected if no game from state and no saved game
 
       if (!gameFromState && allCombinedGames.length > 0) {
@@ -1407,6 +1411,154 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
 
     navigate('/schedule');
 
+  };
+
+  const navigateToPDF = () => {
+
+    setActivePage('pdf');
+
+    navigate('/pdf');
+
+  };
+
+  const handleExportReport = async () => {
+    if (!selectedGame) {
+      alert('Please select a game first');
+      return;
+    }
+
+    setExportLoading(true);
+    setExportError(null);
+
+    try {
+      console.log('📝 Generating announcer report for:', selectedGame);
+      
+      const report = await footballApi.generateAnnouncerReport(
+        selectedGame.id,
+        selectedGame.awayTeam,
+        selectedGame.homeTeam,
+        selectedGame.league || 'nfl',
+        selectedGame.date
+      );
+
+      if (report.success && report.data && report.pdf_path) {
+        // Upload the generated PDF to the PDF editor
+        await uploadReportToPDFEditor(report.pdf_path, selectedGame);
+        alert('Announcer report generated and opened in PDF editor!');
+      } else {
+        throw new Error(report.error || 'Failed to generate report');
+      }
+    } catch (error) {
+      console.error('💥 Error generating announcer report:', error);
+      setExportError(error.message);
+      alert(`Error generating report: ${error.message}`);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const uploadReportToPDFEditor = async (pdfPath, game) => {
+    try {
+      // Fetch the generated PDF from the backend
+      const response = await fetch(`http://localhost:8000/processed/${pdfPath.split('/').pop()}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch generated PDF');
+      }
+      
+      const pdfBlob = await response.blob();
+      
+      // Create a File object from the blob
+      const pdfFile = new File([pdfBlob], `Announcer_Report_${game.awayTeam}_vs_${game.homeTeam}.pdf`, {
+        type: 'application/pdf'
+      });
+      
+      // Upload to PDF editor
+      const formData = new FormData();
+      formData.append('file', pdfFile);
+      
+      const uploadResponse = await fetch('http://localhost:8000/upload-pdf', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload PDF to editor');
+      }
+      
+      const uploadResult = await uploadResponse.json();
+      console.log('📄 PDF uploaded to editor:', uploadResult);
+      
+      // Navigate to PDF editor with the uploaded file
+      navigate('/pdf', { 
+        state: { 
+          fileId: uploadResult.file_id,
+          fileName: pdfFile.name,
+          fromAnnouncerReport: true
+        } 
+      });
+      
+    } catch (error) {
+      console.error('💥 Error uploading report to PDF editor:', error);
+      throw error;
+    }
+  };
+
+  const formatReportForDownload = (reportData) => {
+    const { gameInfo, page1, page2, page3 } = reportData;
+    
+    let reportText = `ANNOUNCER REPORT - ${gameInfo.awayTeam} vs ${gameInfo.homeTeam}\n`;
+    reportText += `Date: ${gameInfo.date} | League: ${gameInfo.league.toUpperCase()}\n`;
+    reportText += `Generated: ${new Date().toLocaleString()}\n`;
+    reportText += `${'='.repeat(60)}\n\n`;
+
+    // Page 1
+    reportText += `PAGE 1: ${page1.title}\n`;
+    reportText += `${'-'.repeat(40)}\n\n`;
+    reportText += `AWAY TEAM (${gameInfo.awayTeam}) RECORD:\n${page1.awayTeamRecord}\n\n`;
+    reportText += `HOME TEAM (${gameInfo.homeTeam}) RECORD:\n${page1.homeTeamRecord}\n\n`;
+    reportText += `AWAY TEAM RECENT FORM:\n${page1.awayTeamRecentForm}\n\n`;
+    reportText += `HOME TEAM RECENT FORM:\n${page1.homeTeamRecentForm}\n\n`;
+    reportText += `KEY STATISTICS:\n${page1.keyStatistics}\n\n`;
+    reportText += `INJURY REPORTS:\n${page1.injuryReports}\n\n`;
+    reportText += `WEATHER & VENUE:\n${page1.weatherVenue}\n\n`;
+    reportText += `${'='.repeat(60)}\n\n`;
+
+    // Page 2
+    reportText += `PAGE 2: ${page2.title}\n`;
+    reportText += `${'-'.repeat(40)}\n\n`;
+    reportText += `${gameInfo.awayTeam} STAR PLAYERS:\n${page2.awayTeamStars}\n\n`;
+    reportText += `${gameInfo.homeTeam} STAR PLAYERS:\n${page2.homeTeamStars}\n\n`;
+    reportText += `KEY MATCHUPS:\n${page2.keyMatchups}\n\n`;
+    reportText += `PLAYER STATISTICS:\n${page2.playerStatistics}\n\n`;
+    reportText += `ROOKIES & BREAKOUT STARS:\n${page2.rookiesBreakouts}\n\n`;
+    reportText += `COACHING STRATEGIES:\n${page2.coachingStrategies}\n\n`;
+    reportText += `${'='.repeat(60)}\n\n`;
+
+    // Page 3
+    reportText += `PAGE 3: ${page3.title}\n`;
+    reportText += `${'-'.repeat(40)}\n\n`;
+    reportText += `RIVALRY CONTEXT:\n${page3.rivalryContext}\n\n`;
+    reportText += `PLAYOFF IMPLICATIONS:\n${page3.playoffImplications}\n\n`;
+    reportText += `STORYLINES:\n${page3.storylines}\n\n`;
+    reportText += `KEY STATISTICS FOR BROADCAST:\n${page3.keyStatistics}\n\n`;
+    reportText += `GAME-CHANGING MOMENTS TO WATCH:\n${page3.gameChangingMoments}\n\n`;
+    reportText += `${'='.repeat(60)}\n\n`;
+    reportText += `End of Report - Generated by BoothBrain AI\n`;
+
+    return reportText;
+  };
+
+  const downloadReportAsText = (reportText, game) => {
+    const blob = new Blob([reportText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Announcer_Report_${game.awayTeam}_vs_${game.homeTeam}_${game.date || new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
 
@@ -1668,7 +1820,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.log('✅ Comprehensive game data loaded:', combinedStats);
       
       
-
+      
     } catch (error) {
 
       console.error('❌ Error loading game data:', error);
@@ -1738,7 +1890,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       };
       
       
-
+      
     } catch (error) {
 
       console.error('❌ Error loading team season stats:', error);
@@ -1772,7 +1924,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       return teamStats;
       
       
-
+      
     } catch (error) {
 
       console.error('❌ Error loading team stats for', teamName, ':', error);
@@ -2014,7 +2166,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
         }
         
         
-
+        
       } catch (apiError) {
 
         console.log('API search failed:', apiError);
@@ -2024,7 +2176,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       }
       
       
-
+      
     } catch (error) {
 
       console.error('Error in NCAA search:', error);
@@ -2439,17 +2591,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 </button>
 
                 <button
-                  onClick={() => setActivePage('comprehensive')}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                    activePage === 'comprehensive' 
-                      ? 'bg-primary-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Trophy className="w-4 h-4" />
-                  <span>AI Stats</span>
-                </button>
-                <button
 
                   onClick={navigateToSchedule}
 
@@ -2468,6 +2609,28 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                   <Calendar className="w-4 h-4" />
 
                   <span>Schedule</span>
+
+                </button>
+
+                <button
+
+                  onClick={navigateToPDF}
+
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+
+                    activePage === 'pdf' 
+
+                      ? 'bg-primary-600 text-white' 
+
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+
+                  }`}
+
+                >
+
+                  <FileText className="w-4 h-4" />
+
+                  <span>Import</span>
 
                 </button>
 
@@ -3659,21 +3822,19 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
 
                             <button
 
-                              onClick={() => {
+                              onClick={handleExportReport}
 
-                                alert('PDF export functionality has been removed. Game statistics are available for viewing only.');
+                              disabled={!selectedGame || exportLoading}
 
-                              }}
+                              className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 
-                              className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-
-                              title="Export functionality removed"
+                              title="Generate 3-page announcer report"
 
                             >
 
                               <Download className="w-4 h-4" />
 
-                              <span className="hidden sm:inline">Export (Disabled)</span>
+                              <span className="hidden sm:inline">{exportLoading ? 'Generating...' : 'Export Report'}</span>
 
                             </button>
 

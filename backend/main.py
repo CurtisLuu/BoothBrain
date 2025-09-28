@@ -7,7 +7,7 @@ import fitz  # PyMuPDF
 import io
 import base64
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import uuid
 from datetime import datetime
@@ -68,6 +68,15 @@ class PDFEditRequest(BaseModel):
     annotations: List[AnnotationData]
     page: int = 0
 
+class PDFTextEditRequest(BaseModel):
+    file_id: str
+    page: int
+    text_blocks: List[Dict[str, Any]]  # List of text blocks with position and content
+
+class PDFTextExtractRequest(BaseModel):
+    file_id: str
+    page: int = 0
+
 class NFLQuestionRequest(BaseModel):
     question: str
 
@@ -82,6 +91,7 @@ class GameSummaryRequest(BaseModel):
     away_team: str
     home_team: str
     league: str = "nfl"
+    date: Optional[str] = None
 
 class GameDetailsRequest(BaseModel):
     game_id: str
@@ -567,6 +577,300 @@ async def get_game_details_endpoint(request: GameDetailsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting game details: {str(e)}")
 
+def generate_announcer_report(game_id: str, away_team: str, home_team: str, league: str = "nfl", date: str = None) -> Dict[str, Any]:
+    """
+    Generate a comprehensive 3-page announcer report using Gemini AI.
+    This report is designed to reduce research time for football announcers.
+    """
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    game_date = date if date else current_date
+    
+    # Determine if this is a future game
+    is_future_game = False
+    if date:
+        try:
+            game_datetime = datetime.strptime(date, "%Y-%m-%d")
+            current_datetime = datetime.now()
+            is_future_game = game_datetime > current_datetime
+        except:
+            pass
+    
+    time_context = "upcoming" if is_future_game else "recent"
+    
+    prompt = (
+        f"You are an expert NFL analyst creating a comprehensive 3-page announcer report for the {time_context} game between {away_team} and {home_team} "
+        f"on {game_date} (Game ID: {game_id}, League: {league.upper()}). "
+        f"This report is specifically designed for football announcers to reduce their research time. "
+        f"All information must be current and relevant to this specific match. "
+        f"{'Since this is a future game, focus on current season performance, recent trends, and what to expect in this matchup.' if is_future_game else 'Focus on recent performance and current season context.'} "
+        f"Please provide a detailed 3-page report with the following structure:\n\n"
+        
+        f"PAGE 1 - TEAM OVERVIEW & RECENT FORM:\n"
+        f"- Current season records and standings\n"
+        f"- Recent performance trends (last 5 games)\n"
+        f"- Key team statistics and rankings\n"
+        f"- Injury reports and roster updates\n"
+        f"- Weather conditions and venue information\n"
+        f"{'- Key storylines and what to expect in this matchup' if is_future_game else '- Recent game highlights and key moments'}\n\n"
+        
+        f"PAGE 2 - KEY PLAYERS & MATCHUPS:\n"
+        f"- Star players to watch on both teams\n"
+        f"- Key positional matchups to highlight\n"
+        f"- Player statistics and recent performances\n"
+        f"- Rookie players or breakout stars\n"
+        f"- Coaching strategies and tendencies\n"
+        f"{'- Players to watch for potential breakout performances' if is_future_game else '- Standout performances from recent games'}\n\n"
+        
+        f"PAGE 3 - GAME NARRATIVE & TALKING POINTS:\n"
+        f"- Historical rivalry context (if applicable)\n"
+        f"- Playoff implications and stakes\n"
+        f"- Storylines and narratives for broadcast\n"
+        f"- Key statistics to reference during the game\n"
+        f"- Potential game-changing moments to watch for\n"
+        f"{'- Predictions and what to expect in this matchup' if is_future_game else '- Key moments and turning points from recent games'}\n\n"
+        
+        f"Return the data in JSON format with the following structure:\n"
+        f"{{\n"
+        f'  "gameInfo": {{\n'
+        f'    "gameId": "{game_id}",\n'
+        f'    "awayTeam": "{away_team}",\n'
+        f'    "homeTeam": "{home_team}",\n'
+        f'    "league": "{league}",\n'
+        f'    "date": "{game_date}"\n'
+        f'  }},\n'
+        f'  "page1": {{\n'
+        f'    "title": "Team Overview & Recent Form",\n'
+        f'    "awayTeamRecord": "string",\n'
+        f'    "homeTeamRecord": "string",\n'
+        f'    "awayTeamRecentForm": "string",\n'
+        f'    "homeTeamRecentForm": "string",\n'
+        f'    "keyStatistics": "string",\n'
+        f'    "injuryReports": "string",\n'
+        f'    "weatherVenue": "string"\n'
+        f'  }},\n'
+        f'  "page2": {{\n'
+        f'    "title": "Key Players & Matchups",\n'
+        f'    "awayTeamStars": "string",\n'
+        f'    "homeTeamStars": "string",\n'
+        f'    "keyMatchups": "string",\n'
+        f'    "playerStatistics": "string",\n'
+        f'    "rookiesBreakouts": "string",\n'
+        f'    "coachingStrategies": "string"\n'
+        f'  }},\n'
+        f'  "page3": {{\n'
+        f'    "title": "Game Narrative & Talking Points",\n'
+        f'    "rivalryContext": "string",\n'
+        f'    "playoffImplications": "string",\n'
+        f'    "storylines": "string",\n'
+        f'    "keyStatistics": "string",\n'
+        f'    "gameChangingMoments": "string"\n'
+        f'  }}\n'
+        f"}}"
+    )
+    
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=config
+        )
+        
+        # Parse the JSON response
+        response_text = response.text.strip()
+        if response_text.startswith('```json'):
+            response_text = response_text[7:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+        
+        report_data = json.loads(response_text)
+        return report_data
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")
+        return {
+            "error": "Failed to parse AI response",
+            "raw_response": response_text
+        }
+    except Exception as e:
+        print(f"Error generating announcer report: {e}")
+        return {
+            "error": str(e)
+        }
+
+@app.post("/generate-announcer-report")
+async def generate_announcer_report_endpoint(request: GameSummaryRequest):
+    """Generate comprehensive 3-page announcer report using Gemini AI"""
+    try:
+        report = generate_announcer_report(request.game_id, request.away_team, request.home_team, request.league, request.date)
+        
+        # Generate PDF from the report
+        pdf_path = generate_announcer_pdf(report, request.game_id, request.away_team, request.home_team)
+        
+        return {
+            "success": True,
+            "data": report,
+            "pdf_path": pdf_path
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def generate_announcer_pdf(report_data, game_id, away_team, home_team):
+    """Generate a PDF from the announcer report data"""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        
+        # Create PDF filename
+        pdf_filename = f"announcer_report_{away_team}_vs_{home_team}_{game_id}.pdf"
+        pdf_path = f"processed/{pdf_filename}"
+        
+        # Ensure processed directory exists
+        os.makedirs("processed", exist_ok=True)
+        
+        # Create PDF document
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center alignment
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=12,
+            spaceBefore=20
+        )
+        
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=6,
+            leftIndent=20
+        )
+        
+        # Build PDF content
+        story = []
+        
+        # Title page
+        story.append(Paragraph(f"ANNOUNCER REPORT", title_style))
+        story.append(Paragraph(f"{away_team} vs {home_team}", title_style))
+        story.append(Paragraph(f"Date: {report_data['gameInfo']['date']}", styles['Normal']))
+        story.append(Paragraph(f"League: {report_data['gameInfo']['league'].upper()}", styles['Normal']))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+        story.append(Spacer(1, 0.5*inch))
+        story.append(PageBreak())
+        
+        # Page 1 - Team Overview
+        page1 = report_data['page1']
+        story.append(Paragraph(f"PAGE 1: {page1['title']}", heading_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{away_team} Record:</b>", heading_style))
+        story.append(Paragraph(page1['awayTeamRecord'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{home_team} Record:</b>", heading_style))
+        story.append(Paragraph(page1['homeTeamRecord'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{away_team} Recent Form:</b>", heading_style))
+        story.append(Paragraph(page1['awayTeamRecentForm'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{home_team} Recent Form:</b>", heading_style))
+        story.append(Paragraph(page1['homeTeamRecentForm'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Key Statistics:</b>", heading_style))
+        story.append(Paragraph(page1['keyStatistics'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Injury Reports:</b>", heading_style))
+        story.append(Paragraph(page1['injuryReports'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Weather & Venue:</b>", heading_style))
+        story.append(Paragraph(page1['weatherVenue'], body_style))
+        story.append(PageBreak())
+        
+        # Page 2 - Key Players
+        page2 = report_data['page2']
+        story.append(Paragraph(f"PAGE 2: {page2['title']}", heading_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{away_team} Star Players:</b>", heading_style))
+        story.append(Paragraph(page2['awayTeamStars'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph(f"<b>{home_team} Star Players:</b>", heading_style))
+        story.append(Paragraph(page2['homeTeamStars'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Key Matchups:</b>", heading_style))
+        story.append(Paragraph(page2['keyMatchups'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Player Statistics:</b>", heading_style))
+        story.append(Paragraph(page2['playerStatistics'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Rookies & Breakout Stars:</b>", heading_style))
+        story.append(Paragraph(page2['rookiesBreakouts'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Coaching Strategies:</b>", heading_style))
+        story.append(Paragraph(page2['coachingStrategies'], body_style))
+        story.append(PageBreak())
+        
+        # Page 3 - Game Narrative
+        page3 = report_data['page3']
+        story.append(Paragraph(f"PAGE 3: {page3['title']}", heading_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Rivalry Context:</b>", heading_style))
+        story.append(Paragraph(page3['rivalryContext'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Playoff Implications:</b>", heading_style))
+        story.append(Paragraph(page3['playoffImplications'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Storylines:</b>", heading_style))
+        story.append(Paragraph(page3['storylines'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Key Statistics for Broadcast:</b>", heading_style))
+        story.append(Paragraph(page3['keyStatistics'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("<b>Game-Changing Moments to Watch:</b>", heading_style))
+        story.append(Paragraph(page3['gameChangingMoments'], body_style))
+        story.append(Spacer(1, 12))
+        
+        story.append(Paragraph("End of Report - Generated by BoothBrain AI", styles['Normal']))
+        
+        # Build PDF
+        doc.build(story)
+        
+        return pdf_path
+        
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        return None
+
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
@@ -617,6 +921,42 @@ async def get_pdf_info(file_id: str):
         raise HTTPException(status_code=404, detail="File not found")
     return file_storage[file_id]
 
+@app.get("/pdf-page/{file_id}/{page}")
+async def get_pdf_page(file_id: str, page: int):
+    """Get a specific page of a PDF as an image"""
+    if file_id not in file_storage:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = file_storage[file_id]
+    
+    try:
+        pdf_doc = fitz.open(file_info["file_path"])
+        if page >= pdf_doc.page_count:
+            raise HTTPException(status_code=400, detail="Page number out of range")
+        
+        # Render page as image
+        page_obj = pdf_doc[page]
+        pix = page_obj.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+        img_data = pix.tobytes("png")
+        
+        pdf_doc.close()
+        
+        # Create a temporary file to avoid BytesIO issue
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            tmp_file.write(img_data)
+            tmp_file_path = tmp_file.name
+        
+        return FileResponse(
+            tmp_file_path,
+            media_type="image/png",
+            filename=f"page_{page + 1}.png",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error rendering page: {str(e)}")
+
 @app.post("/add-annotations")
 async def add_annotations(request: PDFEditRequest):
     if request.file_id not in file_storage:
@@ -658,6 +998,188 @@ async def download_pdf(file_id: str):
     if not os.path.exists(output_path):
         raise HTTPException(status_code=404, detail="Edited PDF not found")
     return FileResponse(output_path, filename=f"edited_{file_storage[file_id]['filename']}", media_type="application/pdf")
+
+# ====================== PDF Text Editing Endpoints ======================
+@app.post("/extract-pdf-text")
+async def extract_pdf_text(request: PDFTextExtractRequest):
+    """Extract text from a specific page of a PDF with position information"""
+    if request.file_id not in file_storage:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = file_storage[request.file_id]
+    
+    try:
+        pdf_doc = fitz.open(file_info["file_path"])
+        if request.page >= pdf_doc.page_count:
+            raise HTTPException(status_code=400, detail="Page number out of range")
+        
+        page = pdf_doc[request.page]
+        
+        # Extract text with position information
+        text_dict = page.get_text("dict")
+        text_blocks = []
+        
+        for block in text_dict["blocks"]:
+            if "lines" in block:  # Text block
+                block_text = ""
+                block_bbox = block["bbox"]  # [x0, y0, x1, y1]
+                
+                for line in block["lines"]:
+                    line_text = ""
+                    for span in line["spans"]:
+                        line_text += span["text"]
+                    block_text += line_text + "\n"
+                
+                if block_text.strip():
+                    text_blocks.append({
+                        "id": str(uuid.uuid4()),
+                        "text": block_text.strip(),
+                        "bbox": block_bbox,
+                        "x": block_bbox[0],
+                        "y": block_bbox[1],
+                        "width": block_bbox[2] - block_bbox[0],
+                        "height": block_bbox[3] - block_bbox[1],
+                        "font_size": line["spans"][0]["size"] if line["spans"] else 12,
+                        "font_family": line["spans"][0]["font"] if line["spans"] else "helvetica"
+                    })
+        
+        # Get page size before closing the document
+        page_size = {"width": page.rect.width, "height": page.rect.height}
+        pdf_doc.close()
+        
+        response_data = {
+            "file_id": request.file_id,
+            "page": request.page,
+            "text_blocks": text_blocks,
+            "page_size": page_size
+        }
+        
+        return JSONResponse(
+            content=response_data,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error extracting text: {str(e)}")
+
+@app.post("/update-pdf-text")
+async def update_pdf_text(request: PDFTextEditRequest):
+    """Update text content in a PDF by replacing text blocks"""
+    if request.file_id not in file_storage:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = file_storage[request.file_id]
+    
+    try:
+        pdf_doc = fitz.open(file_info["file_path"])
+        if request.page >= pdf_doc.page_count:
+            raise HTTPException(status_code=400, detail="Page number out of range")
+        
+        page = pdf_doc[request.page]
+        
+        # Clear the page content
+        page.clean_contents()
+        
+        # Add new text blocks
+        for text_block in request.text_blocks:
+            if text_block.get("text", "").strip():
+                # Insert text at the specified position
+                point = fitz.Point(text_block["x"], text_block["y"] + text_block["height"])
+                page.insert_text(
+                    point, 
+                    text_block["text"], 
+                    fontsize=text_block.get("font_size", 12),
+                    fontname=text_block.get("font_family", "helvetica")
+                )
+        
+        # Save the updated PDF
+        output_path = f"processed/{request.file_id}_text_edited.pdf"
+        pdf_doc.save(output_path)
+        pdf_doc.close()
+        
+        response_data = {
+            "message": "PDF text updated successfully",
+            "output_path": output_path,
+            "file_id": request.file_id
+        }
+        
+        return JSONResponse(
+            content=response_data,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error updating PDF text: {str(e)}")
+
+@app.get("/download-text-pdf/{file_id}")
+async def download_text_pdf(file_id: str):
+    """Download the text-edited PDF or original if no edits exist"""
+    if file_id not in file_storage:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = file_storage[file_id]
+    output_path = f"processed/{file_id}_text_edited.pdf"
+    
+    # If no edited version exists, return the original PDF
+    if not os.path.exists(output_path):
+        return FileResponse(
+            file_info["file_path"], 
+            filename=f"original_{file_info['filename']}", 
+            media_type="application/pdf",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+    
+    return FileResponse(
+        output_path, 
+        filename=f"text_edited_{file_info['filename']}", 
+        media_type="application/pdf",
+        headers={"Access-Control-Allow-Origin": "*"}
+    )
+
+@app.get("/processed/{filename}")
+async def serve_processed_file(filename: str):
+    """Serve files from the processed directory"""
+    try:
+        file_path = f"processed/{filename}"
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        return FileResponse(
+            file_path,
+            media_type='application/pdf',
+            filename=filename,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error serving file: {str(e)}")
+
+@app.get("/pdf-info/{file_id}")
+async def get_pdf_info(file_id: str):
+    """Get PDF file information"""
+    try:
+        if file_id not in file_storage:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        file_info = file_storage[file_id]
+        
+        # Open PDF to get page count and size
+        pdf_doc = fitz.open(file_info["file_path"])
+        total_pages = pdf_doc.page_count
+        page = pdf_doc[0]
+        page_size = {
+            "width": page.rect.width,
+            "height": page.rect.height
+        }
+        pdf_doc.close()
+        
+        return {
+            "file_id": file_id,
+            "filename": file_info["filename"],
+            "total_pages": total_pages,
+            "page_size": page_size
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting PDF info: {str(e)}")
 
 @app.delete("/pdf/{file_id}")
 async def delete_pdf(file_id: str):

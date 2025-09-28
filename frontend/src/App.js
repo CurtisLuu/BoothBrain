@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar, FileText } from 'lucide-react';
 import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
+import PDFEditor from './components/PDFEditor';
 import CedarChat from './components/CedarChat';
 import RadialMenu from './components/RadialMenu';
 import footballApi from './services/footballApi';
@@ -174,6 +175,11 @@ function Dashboard({ activeTab, setActiveTab }) {
     navigate('/schedule');
   };
 
+  const navigateToPDF = () => {
+    setActivePage('pdf');
+    navigate('/pdf');
+  };
+
 
   const navigateToHome = () => {
     setActivePage('home');
@@ -236,6 +242,17 @@ function Dashboard({ activeTab, setActiveTab }) {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
+                </button>
+                <button
+                  onClick={navigateToPDF}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'pdf' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Import</span>
                 </button>
               </div>
 
@@ -478,20 +495,32 @@ function Dashboard({ activeTab, setActiveTab }) {
   );
 }
 
-// Main App Component with Router
-function App() {
+
+// App Content Component (inside Router context)
+function AppContent() {
   const [activeTab, setActiveTab] = useState('nfl');
   
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Page Content */}
+      <Routes>
+        <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
+        <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+        <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
+        <Route path="/pdf" element={<PDFEditor />} />
+        <Route path="/team" element={<TeamPage />} />
+      </Routes>
+    </div>
+  );
+}
+
+// Main App Component with Router
+function App() {
   return (
     <DarkModeProvider>
       <Router>
         <SearchProvider>
-          <Routes>
-            <Route path="/" element={<Dashboard activeTab={activeTab} setActiveTab={setActiveTab} />} />
-            <Route path="/stats" element={<GameStatsPage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-            <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
-            <Route path="/team" element={<TeamPage />} />
-          </Routes>
+          <AppContent />
           {/* Global Cedar Chat - Persistent across all pages */}
           <CedarChat />
         </SearchProvider>

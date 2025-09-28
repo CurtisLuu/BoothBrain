@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, MapPin, Filter, ChevronDown } from 'lucide-react';
+import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, MapPin, Filter, ChevronDown, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
@@ -258,6 +258,11 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     navigate('/stats');
   };
 
+  const navigateToPDF = () => {
+    setActivePage('pdf');
+    navigate('/pdf');
+  };
+
   const navigateToSchedule = () => {
     setActivePage('schedule');
     navigate('/schedule');
@@ -324,6 +329,17 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
+                </button>
+                <button
+                  onClick={navigateToPDF}
+                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
+                    activePage === 'pdf' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Import</span>
                 </button>
               </div>
 

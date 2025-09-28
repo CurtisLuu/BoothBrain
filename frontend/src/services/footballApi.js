@@ -298,6 +298,70 @@ class FootballApiService {
     }
   }
 
+  // Get comprehensive game stats and roster using Gemini AI
+  async getComprehensiveGameStatsAndRoster(gameId, awayTeam, homeTeam, league = 'nfl', date) {
+    try {
+      console.log(`🤖 Fetching comprehensive stats from Gemini for ${awayTeam} vs ${homeTeam}...`);
+      
+      const response = await fetch('http://localhost:8000/game-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: gameId,
+          away_team: awayTeam,
+          home_team: homeTeam,
+          league: league,
+          date: date
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('🤖 Comprehensive stats from Gemini:', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Error fetching comprehensive stats from Gemini:', error);
+      throw error;
+    }
+  }
+
+  // Generate announcer report using Gemini AI
+  async generateAnnouncerReport(gameId, awayTeam, homeTeam, league = 'nfl', date) {
+    try {
+      console.log(`📝 Generating announcer report for ${awayTeam} vs ${homeTeam}...`);
+      
+      const response = await fetch('http://localhost:8000/generate-announcer-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: gameId,
+          away_team: awayTeam,
+          home_team: homeTeam,
+          league: league,
+          date: date
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📝 Announcer report generated:', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Error generating announcer report:', error);
+      throw error;
+    }
+  }
+
 
   // Get team information by name
   async getTeamByName(teamName, league = 'nfl') {
