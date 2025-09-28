@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, BarChart3, Calendar, Home, Search, Moon, Sun, Upload } from 'lucide-react';
+import { ArrowLeft, Trophy, BarChart3, Calendar, Home, Search, Moon, Sun } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
+import sportsApiService from '../services/sportsApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
 
 const TeamPage = () => {
@@ -20,6 +21,8 @@ const TeamPage = () => {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [allGames, setAllGames] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Get team from location state
   const teamFromState = location.state?.team;
@@ -30,8 +33,22 @@ const TeamPage = () => {
       setActiveLeague(teamFromState.league);
       loadTeamData(teamFromState);
       loadRosterStats(teamFromState);
+      setLastUpdated(new Date());
     }
   }, [teamFromState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh functionality for real-time updates
+  useEffect(() => {
+    if (!autoRefresh || !team) return;
+
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing team data...');
+      loadTeamData(team);
+      setLastUpdated(new Date());
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, team]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Load all games for search functionality
@@ -108,10 +125,6 @@ const TeamPage = () => {
     navigate('/schedule');
   };
 
-  const navigateToImport = () => {
-    setActivePage('import');
-    navigate('/import');
-  };
 
   const loadAllGames = async () => {
     try {
@@ -126,69 +139,61 @@ const TeamPage = () => {
   };
 
   // Helper function to get current week
-  const getCurrentWeek = () => {
-    const now = new Date();
-    const startOfSeason = new Date(now.getFullYear(), 7, 1); // August 1st
-    const weeksSinceStart = Math.floor((now - startOfSeason) / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(1, weeksSinceStart + 1);
-  };
 
   const loadTeamData = async (teamData) => {
     setLoading(true);
     try {
-      console.log('Loading complete season data for:', teamData.name);
+      console.log('=== LOADING TEAM DATA ===');
+      console.log('Team:', teamData.name);
+      console.log('League:', teamData.league);
+      console.log('========================');
       
-      // Load current games from both leagues to get a comprehensive dataset
-      const [nflGames, ncaaGames, previousNFLGames, previousNCAAGames, nextNFLGames, nextNCAAGames] = await Promise.all([
-        footballApi.getNFLGames(),
-        footballApi.getNCAAGames(),
-        footballApi.getPreviousWeekNFLGames(),
-        footballApi.getPreviousWeekNCAAGames(),
-        footballApi.getNextWeekNFLGames(),
-        footballApi.getNextWeekNCAAGames()
-      ]);
+      // Fetch real team games from ESPN API
+      const gamesData = await footballApi.getTeamGames(teamData.name, teamData.league);
+      console.log(`Raw games data received:`, gamesData);
+      
+      const { pastGames, futureGames } = gamesData;
+      
+      // Combine past and future games, with past games first
+      const allTeamGames = [...pastGames, ...futureGames];
+      
+      console.log(`=== ESPN API RESULTS FOR ${teamData.name.toUpperCase()} ===`);
+      console.log(`Past games: ${pastGames.length}`);
+      console.log(`Future games: ${futureGames.length}`);
+      console.log(`Total games: ${allTeamGames.length}`);
+      console.log('Sample past game:', pastGames[0]);
+      console.log('Sample future game:', futureGames[0]);
+      console.log('All team games array:', allTeamGames);
+      console.log('==========================================');
 
-      // Combine all games from both leagues
-      const allGames = [
-        ...nflGames,
-        ...ncaaGames,
-        ...previousNFLGames,
-        ...previousNCAAGames,
-        ...nextNFLGames,
-        ...nextNCAAGames
-      ];
-
-      // Remove duplicates based on game ID
-      const uniqueGames = allGames.filter((game, index, self) => 
-        index === self.findIndex(g => g.id === game.id)
-      );
-
-      // Filter games that involve this team
-      const teamGames = uniqueGames.filter(game => 
-        game.awayTeam === teamData.name || game.homeTeam === teamData.name
-      );
-
-      // If we don't have enough games, generate additional mock games for a complete season
-      const completeTeamGames = generateCompleteSeasonGames(teamData, teamGames);
-
-      console.log('Total games loaded:', allGames.length);
-      console.log('Unique games:', uniqueGames.length);
-      console.log('Team games found:', teamGames.length);
-      console.log('Complete season games:', completeTeamGames.length);
-
-      setTeamGames(completeTeamGames);
-
-      // Calculate team statistics
-      const stats = calculateTeamStats(completeTeamGames, teamData.name);
-      setTeamStats(stats);
+      // Only use real ESPN data - no fallback to mock data
+      if (allTeamGames.length > 0) {
+        console.log('✅ Using real ESPN data');
+        console.log('Setting team games state with:', allTeamGames.length, 'games');
+        setTeamGames(allTeamGames);
+        
+        // Get comprehensive team statistics from ESPN API
+        const comprehensiveStats = await footballApi.getTeamStats(teamData.name, teamData.league);
+        if (comprehensiveStats) {
+          setTeamStats(comprehensiveStats);
+          console.log('Comprehensive team stats from ESPN API:', comprehensiveStats);
+        } else {
+          // Fallback to basic calculation if API fails
+          const stats = calculateTeamStats(allTeamGames, teamData.name);
+          setTeamStats(stats);
+          console.log('Fallback team stats calculated:', stats);
+        }
+      } else {
+        console.log('❌ No real games found from ESPN API - showing empty state');
+        setTeamGames([]);
+        setTeamStats(null);
+      }
 
     } catch (error) {
-      console.error('Error loading team data:', error);
-      // Fallback to mock data
-      const mockGames = generateCompleteSeasonGames(teamData, []);
-      setTeamGames(mockGames);
-      const stats = calculateTeamStats(mockGames, teamData.name);
-      setTeamStats(stats);
+      console.error('❌ Error loading team data from ESPN API:', error);
+      console.log('ESPN API failed - showing empty state instead of mock data');
+      setTeamGames([]);
+      setTeamStats(null);
     } finally {
       setLoading(false);
     }
@@ -304,119 +309,7 @@ const TeamPage = () => {
     return roster;
   };
 
-  // Generate a complete season of games for a team
-  const generateCompleteSeasonGames = (teamData, existingGames) => {
-    const teamName = teamData.name;
-    const league = teamData.league || 'nfl';
-    
-    // If we already have enough games (8+), return them
-    if (existingGames.length >= 8) {
-      return existingGames;
-    }
-
-    // Generate additional games to create a complete season
-    const additionalGames = [];
-    const currentWeek = getCurrentWeek();
-    
-    // Common opponents for each league
-    const nflOpponents = [
-      'Kansas City Chiefs', 'Buffalo Bills', 'Miami Dolphins', 'New England Patriots',
-      'New York Jets', 'Pittsburgh Steelers', 'Baltimore Ravens', 'Cleveland Browns',
-      'Cincinnati Bengals', 'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars',
-      'Tennessee Titans', 'Denver Broncos', 'Las Vegas Raiders', 'Los Angeles Chargers',
-      'Dallas Cowboys', 'Philadelphia Eagles', 'New York Giants', 'Washington Commanders',
-      'Green Bay Packers', 'Minnesota Vikings', 'Chicago Bears', 'Detroit Lions',
-      'Tampa Bay Buccaneers', 'New Orleans Saints', 'Atlanta Falcons', 'Carolina Panthers',
-      'Arizona Cardinals', 'Los Angeles Rams', 'San Francisco 49ers', 'Seattle Seahawks'
-    ];
-
-    const ncaaOpponents = [
-      'Georgia Bulldogs', 'Alabama Crimson Tide', 'Ohio State Buckeyes', 'Michigan Wolverines',
-      'USC Trojans', 'UCLA Bruins', 'Texas Longhorns', 'Oklahoma Sooners',
-      'Florida Gators', 'LSU Tigers', 'Auburn Tigers', 'Tennessee Volunteers',
-      'Penn State Nittany Lions', 'Wisconsin Badgers', 'Iowa Hawkeyes', 'Nebraska Cornhuskers',
-      'Clemson Tigers', 'Florida State Seminoles', 'Miami Hurricanes', 'Virginia Tech Hokies',
-      'Oregon Ducks', 'Washington Huskies', 'Stanford Cardinal', 'California Golden Bears',
-      'Notre Dame Fighting Irish', 'Boston College Eagles', 'Syracuse Orange', 'Pittsburgh Panthers'
-    ];
-
-    const opponents = league === 'nfl' ? nflOpponents : ncaaOpponents;
-    
-    // Filter out the current team from opponents
-    const availableOpponents = opponents.filter(opponent => 
-      opponent !== teamName && 
-      !existingGames.some(game => 
-        game.awayTeam === opponent || game.homeTeam === opponent
-      )
-    );
-
-    // Generate games for weeks 1 through current week
-    for (let week = 1; week <= currentWeek; week++) {
-      // Skip if we already have a game for this week
-      if (existingGames.some(game => game.week === `Week ${week}`)) {
-        continue;
-      }
-
-      // Pick a random opponent
-      const opponent = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
-      if (!opponent) continue;
-
-      // Remove the opponent from available list to avoid duplicates
-      const opponentIndex = availableOpponents.indexOf(opponent);
-      if (opponentIndex > -1) {
-        availableOpponents.splice(opponentIndex, 1);
-      }
-
-      // Randomly decide if team is home or away
-      const isHome = Math.random() > 0.5;
-      const homeTeam = isHome ? teamName : opponent;
-      const awayTeam = isHome ? opponent : teamName;
-
-      // Generate realistic scores
-      const homeScore = Math.floor(Math.random() * 21) + 14; // 14-34 points
-      const awayScore = Math.floor(Math.random() * 21) + 14; // 14-34 points
-
-      // Generate game date (Saturdays for NCAA, Sundays for NFL)
-      const gameDate = new Date();
-      gameDate.setDate(gameDate.getDate() - (currentWeek - week) * 7);
-      if (league === 'ncaa') {
-        // NCAA games are typically on Saturdays
-        gameDate.setDate(gameDate.getDate() - gameDate.getDay() + 6);
-      } else {
-        // NFL games are typically on Sundays
-        gameDate.setDate(gameDate.getDate() - gameDate.getDay());
-      }
-
-      const game = {
-        id: `generated-${teamName}-${week}-${Date.now()}`,
-        homeTeam,
-        awayTeam,
-        homeScore,
-        awayScore,
-        status: 'Final',
-        time: league === 'ncaa' ? '3:30 PM ET' : '1:00 PM ET',
-        date: gameDate.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric'
-        }),
-        week: `Week ${week}`,
-        league
-      };
-
-      additionalGames.push(game);
-    }
-
-    // Combine existing games with generated games
-    const allGames = [...existingGames, ...additionalGames];
-    
-    // Sort by week
-    return allGames.sort((a, b) => {
-      const weekA = parseInt(a.week.replace('Week ', ''));
-      const weekB = parseInt(b.week.replace('Week ', ''));
-      return weekA - weekB;
-    });
-  };
+  // Generate a complete season of games for a team (legacy function - kept for compatibility)
 
   const calculateTeamStats = (games, teamName) => {
     const teamGames = games.filter(game => 
@@ -570,17 +463,6 @@ const TeamPage = () => {
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
                 </button>
-                <button
-                  onClick={navigateToImport}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                    activePage === 'import' 
-                      ? 'bg-primary-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Import</span>
-                </button>
               </div>
 
               {/* Search Bar */}
@@ -645,25 +527,85 @@ const TeamPage = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Loading complete season data...</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
+        <div className="space-y-8">
             {/* Team Statistics Overview */}
             {teamStats && (
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-                  <BarChart3 className="w-6 h-6 mr-3 text-primary-600" />
-                  Season Statistics
-                  <span className="ml-3 px-3 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full">
-                    {team.league?.toUpperCase()}
-                  </span>
-                </h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
+                    <BarChart3 className="w-6 h-6 mr-3 text-primary-600" />
+                    Season Statistics
+                    <span className="ml-3 px-3 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full">
+                      {team.league?.toUpperCase()}
+                    </span>
+                  </h2>
+                  
+                  <div className="flex items-center space-x-4">
+                    {lastUpdated && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Last updated: {lastUpdated.toLocaleTimeString()}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center space-x-2">
+                      <label className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={autoRefresh}
+                          onChange={(e) => setAutoRefresh(e.target.checked)}
+                          className="mr-2 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        Auto-refresh
+                      </label>
+                      
+                      <button
+                        onClick={() => {
+                          loadTeamData(team);
+                          setLastUpdated(new Date());
+                        }}
+                        className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+                      >
+                        Refresh
+                      </button>
+                      
+        <button
+          onClick={() => {
+            console.log('=== CACHE DEBUG ===');
+            sportsApiService.getCacheStats();
+            sportsApiService.clearExpiredCache();
+          }}
+          className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+          title="Debug cache and clear expired entries"
+        >
+          Cache Debug
+        </button>
+        <button
+          onClick={async () => {
+            console.log('=== API CONNECTIVITY TEST ===');
+            const isWorking = await sportsApiService.testApiConnectivity();
+            console.log(`API is working: ${isWorking}`);
+          }}
+          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          title="Test API connectivity"
+        >
+          Test API
+        </button>
+        <button
+          onClick={() => {
+            console.log('=== CLEARING ALL CACHE ===');
+            sportsApiService.clearCache();
+            console.log('Cache cleared! Refreshing team data...');
+            loadTeamData(team);
+            setLastUpdated(new Date());
+          }}
+          className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          title="Clear all cache and refresh data"
+        >
+          Clear Cache
+        </button>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Record */}
@@ -675,6 +617,11 @@ const TeamPage = () => {
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       {teamStats.winPercentage}% win rate
                     </div>
+                    {teamStats.currentStreak > 0 && (
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        {teamStats.currentStreakType}{teamStats.currentStreak} streak
+                      </div>
+                    )}
                   </div>
 
                   {/* Points */}
@@ -685,6 +632,9 @@ const TeamPage = () => {
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       points per game
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {teamStats.totalPointsFor} total
                     </div>
                   </div>
 
@@ -697,6 +647,9 @@ const TeamPage = () => {
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       total differential
                     </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {teamStats.pointsAllowedPerGame} allowed/game
+                    </div>
                   </div>
 
                   {/* Home/Away Record */}
@@ -707,6 +660,9 @@ const TeamPage = () => {
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       home / away record
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {teamStats.homeWinPercentage}% / {teamStats.awayWinPercentage}%
                     </div>
                   </div>
                 </div>
@@ -732,81 +688,274 @@ const TeamPage = () => {
                     <div className="text-sm text-gray-500 dark:text-gray-400">Total Games</div>
                   </div>
                 </div>
+
+                {/* Advanced Statistics */}
+                {(teamStats.longestWinStreak > 0 || teamStats.longestLossStreak > 0 || teamStats.recentForm) && (
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {teamStats.longestWinStreak > 0 && (
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Longest Win Streak</h3>
+                        <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+                          {teamStats.longestWinStreak}
+                        </div>
+                        <div className="text-sm text-green-600 dark:text-green-300">
+                          consecutive wins
+                        </div>
+                      </div>
+                    )}
+                    
+                    {teamStats.longestLossStreak > 0 && (
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">Longest Loss Streak</h3>
+                        <div className="text-2xl font-bold text-red-900 dark:text-red-100">
+                          {teamStats.longestLossStreak}
+                        </div>
+                        <div className="text-sm text-red-600 dark:text-red-300">
+                          consecutive losses
+                        </div>
+                      </div>
+                    )}
+
+                    {teamStats.recentForm && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Recent Form</h3>
+                        <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                          {teamStats.recentForm.wins}-{teamStats.recentForm.losses}-{teamStats.recentForm.ties}
+                        </div>
+                        <div className="text-sm text-blue-600 dark:text-blue-300">
+                          last 5 games
+                        </div>
+                        <div className="text-xs text-blue-500 dark:text-blue-400 mt-1 font-mono">
+                          {teamStats.recentForm.form}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">Season</h3>
+                      <div className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                        {teamStats.season || new Date().getFullYear()}
+                      </div>
+                      <div className="text-sm text-purple-600 dark:text-purple-300">
+                        {team.league?.toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Complete Season Match History */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-                <Calendar className="w-6 h-6 mr-3 text-primary-600" />
-                Complete Season Match History ({teamGames.length} games)
-                <span className="ml-3 px-3 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full">
-                  {team.league?.toUpperCase()}
-                </span>
-              </h2>
+              {console.log('=== RENDER DEBUG ===', {
+                teamGamesLength: teamGames.length,
+                teamGames: teamGames,
+                teamGamesType: typeof teamGames,
+                isArray: Array.isArray(teamGames)
+              })}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
+                  <Calendar className="w-6 h-6 mr-3 text-primary-600" />
+                  Complete Season Match History ({teamGames.length} games)
+                  <span className="ml-3 px-3 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full">
+                    {team.league?.toUpperCase()}
+                  </span>
+                  {loading && (
+                    <div className="ml-4 flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Loading games...</span>
+                    </div>
+                  )}
+                </h2>
+                
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Real-time data from ESPN API
+                </div>
+              </div>
               
               {teamGames.length > 0 ? (
-                <div className="space-y-4">
-                  {teamGames
-                    .sort((a, b) => {
-                      // Sort by date, most recent first
-                      const dateA = new Date(a.date);
-                      const dateB = new Date(b.date);
-                      return dateB - dateA;
-                    })
-                    .map((game) => (
-                      <div
-                        key={game.id}
-                        onClick={() => handleGameClick(game)}
-                        className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {game.awayTeam} @ {game.homeTeam}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {game.date} • {game.time}
-                              </div>
+                <div className="space-y-6">
+                  {/* Match History Summary */}
+                  {(() => {
+                    const pastGames = teamGames.filter(game => game.status === 'Final' || game.status === 'Live');
+                    const futureGames = teamGames.filter(game => game.status === 'Scheduled');
+                    const liveGames = teamGames.filter(game => game.status === 'Live');
+                    
+                    return (
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                              {pastGames.length}
                             </div>
-                            <div className="flex items-center space-x-4 mt-1">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                game.status === 'Final'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : game.status === 'Live'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                              }`}>
-                                {game.status}
-                              </span>
-                              <span className="text-sm text-gray-600 dark:text-gray-300">
-                                {game.awayScore} - {game.homeScore}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {game.week}
-                              </span>
-                              {game.status === 'Final' && (
-                                <span className={`text-xs font-medium ${
-                                  (game.homeTeam === team.name && game.homeScore > game.awayScore) ||
-                                  (game.awayTeam === team.name && game.awayScore > game.homeScore)
-                                    ? 'text-green-600'
-                                    : 'text-red-600'
-                                }`}>
-                                  {(game.homeTeam === team.name && game.homeScore > game.awayScore) ||
-                                   (game.awayTeam === team.name && game.awayScore > game.homeScore)
-                                    ? 'W'
-                                    : 'L'}
-                                </span>
-                              )}
-                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Games Played</div>
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Click to view stats
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                              {futureGames.length}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Upcoming Games</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-red-600">
+                              {liveGames.length}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Live Games</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {teamGames.length}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">Total Games</div>
                           </div>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })()}
+                  
+                  {/* Past Games Section */}
+                  {(() => {
+                    const pastGames = teamGames.filter(game => game.status === 'Final' || game.status === 'Live');
+                    const futureGames = teamGames.filter(game => game.status === 'Scheduled');
+                    
+                    return (
+                      <>
+                        {/* Past Games */}
+                        {pastGames.length > 0 && (
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                              Past Games ({pastGames.length})
+                            </h3>
+                            <div className="space-y-3">
+                              {pastGames
+                                .sort((a, b) => {
+                                  const dateA = new Date(a.date);
+                                  const dateB = new Date(b.date);
+                                  return dateB - dateA;
+                                })
+                                .map((game) => (
+                                  <div
+                                    key={game.id}
+                                    onClick={() => handleGameClick(game)}
+                                    className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center space-x-4">
+                                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {game.awayTeam} @ {game.homeTeam}
+                                          </div>
+                                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                                            {game.date} • {game.time}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center space-x-4 mt-1">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            game.status === 'Final'
+                                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                              : game.status === 'Live'
+                                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                          }`}>
+                                            {game.status}
+                                          </span>
+                                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                                            {game.awayScore} - {game.homeScore}
+                                          </span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {game.week}
+                                          </span>
+                                          {game.status === 'Final' && (
+                                            <span className={`text-xs font-medium ${
+                                              (game.homeTeam === team.name && game.homeScore > game.awayScore) ||
+                                              (game.awayTeam === team.name && game.awayScore > game.homeScore)
+                                                ? 'text-green-600'
+                                                : 'text-red-600'
+                                            }`}>
+                                              {(game.homeTeam === team.name && game.homeScore > game.awayScore) ||
+                                               (game.awayTeam === team.name && game.awayScore > game.homeScore)
+                                                ? 'W'
+                                                : 'L'}
+                                            </span>
+                                          )}
+                                          {game.opponent && (
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                              vs {game.opponent}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        Click to view stats
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Future Games */}
+                        {futureGames.length > 0 && (
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                              Upcoming Games ({futureGames.length})
+                            </h3>
+                            <div className="space-y-3">
+                              {futureGames
+                                .sort((a, b) => {
+                                  const dateA = new Date(a.date);
+                                  const dateB = new Date(b.date);
+                                  return dateA - dateB;
+                                })
+                                .map((game) => (
+                                  <div
+                                    key={game.id}
+                                    onClick={() => handleGameClick(game)}
+                                    className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center space-x-4">
+                                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {game.awayTeam} @ {game.homeTeam}
+                                          </div>
+                                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                                            {game.date} • {game.time}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center space-x-4 mt-1">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            game.status === 'Final'
+                                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                              : game.status === 'Live'
+                                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                          }`}>
+                                            {game.status}
+                                          </span>
+                                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                                            {game.awayScore !== null ? `${game.awayScore} - ${game.homeScore}` : 'TBD'}
+                                          </span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {game.week}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        Click to view stats
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="text-center py-12">
@@ -829,6 +978,16 @@ const TeamPage = () => {
                 <span className="ml-3 px-3 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full">
                   {rosterStats ? rosterStats.length : 0} Players
                 </span>
+                <button
+                  onClick={async () => {
+                    console.log('=== TESTING ESPN API ===');
+                    const testResult = await footballApi.testESPNConnection(team.name, team.league);
+                    console.log('Test result:', testResult);
+                  }}
+                  className="ml-4 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Test ESPN API
+                </button>
               </h2>
               
               {/* Fallback Data Notice */}
@@ -948,9 +1107,9 @@ const TeamPage = () => {
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
+   
   );
 };
 

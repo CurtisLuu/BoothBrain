@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Upload, Download } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Download } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
-import { generateGameStatsHTMLPDF } from '../utils/pdfGenerator';
 
 // All Statistics Section Component
 const AllStatisticsSection = ({ selectedGame, teamStats }) => {
@@ -496,10 +495,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     navigate('/schedule');
   };
 
-  const navigateToImport = () => {
-    setActivePage('import');
-    navigate('/import');
-  };
 
   const handleGameSelect = (game) => {
     console.log('Game selected:', game);
@@ -660,7 +655,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   };
 
   // Function to load comprehensive data for a selected game
-  const loadGameData = async (game) => {
+  const loadGameData = useCallback(async (game) => {
     if (!game || !game.id) {
       console.log('No game or game ID provided for data loading');
       return;
@@ -739,7 +734,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.log('🏁 Finished loadGameData');
       setGameDataLoading(false);
     }
-  };
+  }, []);
 
 
   // Load team season stats for both teams
@@ -792,7 +787,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.log('Selected game changed, loading data for:', selectedGame.id);
       loadGameData(selectedGame);
     }
-  }, [selectedGame]);
+  }, [selectedGame, loadGameData]);
 
   // Auto-refresh effect for live games
   useEffect(() => {
@@ -1038,17 +1033,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
-                </button>
-                <button
-                  onClick={navigateToImport}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                    activePage === 'import' 
-                      ? 'bg-primary-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Import</span>
                 </button>
               </div>
 
@@ -1653,14 +1637,13 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                             </div>
                             <button
                               onClick={() => {
-                                // Export as PDF using HTML-based PDF generation
-                                generateGameStatsHTMLPDF(selectedGame, detailedStats);
+                                alert('PDF export functionality has been removed. Game statistics are available for viewing only.');
                               }}
                               className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                              title="Export game statistics as PDF"
+                              title="Export functionality removed"
                             >
                               <Download className="w-4 h-4" />
-                              <span className="hidden sm:inline">Export PDF</span>
+                              <span className="hidden sm:inline">Export (Disabled)</span>
                             </button>
                           </div>
                         </div>

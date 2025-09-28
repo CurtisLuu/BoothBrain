@@ -30,6 +30,45 @@ class FootballApiService {
     }
   }
 
+  // Get current week number
+  async getCurrentWeek(league) {
+    try {
+      console.log(`Getting current week for ${league}...`);
+      const week = await sportsApiService.getCurrentWeek(league);
+      console.log(`Current week: ${week}`);
+      return week;
+    } catch (error) {
+      console.error('Error getting current week:', error);
+      return 1;
+    }
+  }
+
+  // Get NFL games by specific week
+  async getNFLGamesByWeek(week) {
+    try {
+      console.log(`Fetching NFL games for week ${week}...`);
+      const games = await sportsApiService.getNFLGamesByWeek(week);
+      console.log(`Week ${week} NFL games fetched:`, games.length);
+      return games;
+    } catch (error) {
+      console.error(`Error fetching NFL games for week ${week}:`, error);
+      return [];
+    }
+  }
+
+  // Get NCAA games by specific week
+  async getNCAAGamesByWeek(week) {
+    try {
+      console.log(`Fetching NCAA games for week ${week}...`);
+      const games = await sportsApiService.getNCAAGamesByWeek(week);
+      console.log(`Week ${week} NCAA games fetched:`, games.length);
+      return games;
+    } catch (error) {
+      console.error(`Error fetching NCAA games for week ${week}:`, error);
+      return [];
+    }
+  }
+
   // Get previous week NFL games using real ESPN API
   async getPreviousWeekNFLGames() {
     try {
@@ -193,18 +232,6 @@ class FootballApiService {
     }
   }
 
-  // Get NFL games by specific week
-  async getNFLGamesByWeek(week) {
-    try {
-      console.log(`Fetching NFL games for week ${week}...`);
-      const games = await sportsApiService.getNFLGamesByWeek(week);
-      console.log(`NFL games for week ${week} fetched:`, games);
-      return games;
-    } catch (error) {
-      console.error(`Error fetching NFL games for week ${week}:`, error);
-      return [];
-    }
-  }
 
   // Get team statistics for a specific team
   async getTeamStats(teamName, league) {
@@ -271,18 +298,6 @@ class FootballApiService {
     }
   }
 
-  // Get NCAA games by specific week
-  async getNCAAGamesByWeek(week) {
-    try {
-      console.log(`Fetching NCAA games for week ${week}...`);
-      const games = await sportsApiService.getNCAAGamesByWeek(week);
-      console.log(`NCAA games for week ${week} fetched:`, games);
-      return games;
-    } catch (error) {
-      console.error(`Error fetching NCAA games for week ${week}:`, error);
-      return [];
-    }
-  }
 
   // Get team information by name
   async getTeamByName(teamName, league = 'nfl') {
@@ -307,6 +322,35 @@ class FootballApiService {
     } catch (error) {
       console.error(`Error fetching roster for team ${teamId}:`, error);
       return [];
+    }
+  }
+
+  // Get team-specific games (past and future) using real ESPN API
+  async getTeamGames(teamName, league) {
+    try {
+      console.log(`Fetching ${teamName} games from ESPN API for ${league}...`);
+      const games = await sportsApiService.getTeamGames(teamName, league);
+      console.log(`${teamName} games fetched:`, games);
+      console.log(`Games structure:`, {
+        hasPastGames: !!games.pastGames,
+        hasFutureGames: !!games.futureGames,
+        pastGamesLength: games.pastGames?.length || 0,
+        futureGamesLength: games.futureGames?.length || 0,
+        pastGamesType: typeof games.pastGames,
+        futureGamesType: typeof games.futureGames
+      });
+      
+      // Ensure we always return the expected structure
+      const result = {
+        pastGames: games.pastGames || [],
+        futureGames: games.futureGames || []
+      };
+      
+      console.log(`Returning processed games:`, result);
+      return result;
+    } catch (error) {
+      console.error(`Error fetching ${teamName} games:`, error);
+      return { pastGames: [], futureGames: [] };
     }
   }
 }
