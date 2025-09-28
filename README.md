@@ -1,6 +1,6 @@
 # 🏈 BoothBrain - Advanced Sports Analytics Platform
 
-A comprehensive AI-powered sports analytics platform featuring real-time game analysis, team management, interactive chat, and advanced PDF editing capabilities.
+A comprehensive AI-powered sports analytics platform featuring real-time game analysis, support for announcer reports, and a personal AI football analyst willing to help at any time.
 
 ## 🚀 Features
 
