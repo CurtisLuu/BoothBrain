@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, BarChart3, MessageCircle, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Download } from 'lucide-react';
+import { Trophy, BarChart3, Clock, Users, Award, Home, Search, Moon, Sun, Calendar, Download } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
@@ -2197,24 +2197,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 </div>
               </div>
 
-              {/* Chat Box */}
-              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  <MessageCircle className="w-5 h-5 text-primary-600" />
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">AI Chat</h4>
-                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 px-2 py-1 rounded-full">
-                    Cedar Framework Coming Soon
-                  </span>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[120px] flex items-center justify-center">
-                  <div className="text-center">
-                    <MessageCircle className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                      AI-powered chat interface will be integrated here using the Cedar framework
-                    </p>
-                  </div>
-                </div>
-              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">

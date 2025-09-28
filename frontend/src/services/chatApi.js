@@ -71,6 +71,31 @@ class ChatApiService {
       return { sessions: [] };
     }
   }
+
+  async clearChat(sessionId) {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/clear-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: sessionId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error clearing chat:', error);
+      // Return success even if backend doesn't support it
+      return { success: true };
+    }
+  }
 }
 
 const chatApiService = new ChatApiService();

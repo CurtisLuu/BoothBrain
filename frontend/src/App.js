@@ -474,8 +474,6 @@ function Dashboard({ activeTab, setActiveTab }) {
         </div>
       </section>
 
-      {/* Cedar Chat Component */}
-      <CedarChat />
     </div>
   );
 }
@@ -494,6 +492,8 @@ function App() {
             <Route path="/schedule" element={<SchedulePage activeLeague={activeTab} setActiveLeague={setActiveTab} />} />
             <Route path="/team" element={<TeamPage />} />
           </Routes>
+          {/* Global Cedar Chat - Persistent across all pages */}
+          <CedarChat />
         </SearchProvider>
       </Router>
     </DarkModeProvider>
