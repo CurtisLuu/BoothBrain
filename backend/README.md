@@ -1,4 +1,4 @@
-# 🐍 Backend - Football AI
+# 🐍 Backend - BoothBrain
 
 Python backend services for PDF processing and sports analytics API.
 

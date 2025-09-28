@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting Football AI Application..."
+echo "Starting BoothBrain Application..."
 echo
 
 echo "Starting Frontend (React)..."

@@ -94,16 +94,16 @@ const RadialMenu = ({ isOpen, position, onClose, onOptionSelect, game, isHolding
       
       switch (optionId) {
         case 'summary':
-          prompt = `Please provide a comprehensive game summary for ${gameInfo}. Use Google search to find the latest game statistics, team performance analysis, key moments, and overall game flow. Include score updates, possession stats, and any notable events that shaped the outcome.`;
+          prompt = `As a professional collegiate and NFL analyst, provide a comprehensive game summary for ${gameInfo} from the current season only. Use Google search to find the latest game statistics, team performance analysis, key moments, and overall game flow from this season's games. Include score updates, possession stats, and any notable events that shaped the outcome. Provide expert analysis with professional insights on strategy, execution, and game-changing moments. Focus specifically on current season data and avoid referencing previous seasons.`;
           break;
         case 'players':
-          prompt = `Analyze the standout players from ${gameInfo}. Use Google search to find current player statistics, performance metrics, and public opinion on key contributors. Identify the top performers on both teams and explain why they were crucial to their team's performance.`;
+          prompt = `As a professional collegiate and NFL analyst, analyze the standout players from ${gameInfo} from the current season only. Use Google search to find current season player statistics, performance metrics, and public opinion on key contributors from this season's games. Identify the top performers on both teams and explain why they were crucial to their team's performance. Provide expert analysis on player development, skill sets, and impact on the game. Focus specifically on current season data and avoid referencing previous seasons.`;
           break;
         case 'highlights':
-          prompt = `Find and describe the game-changing plays and highlights from ${gameInfo}. Use Google search to locate video highlights, key moments, spectacular plays, and turning points that defined this game. Focus on the most impactful and memorable moments.`;
+          prompt = `As a professional collegiate and NFL analyst, find and describe the game-changing plays and highlights from ${gameInfo} from the current season only. Use Google search to locate video highlights, key moments, spectacular plays, and turning points that defined this game from this season. Focus on the most impactful and memorable moments from the current season. Provide expert analysis on the significance of these plays, their impact on the game's outcome, and what they reveal about team strategy and execution. Avoid referencing previous seasons.`;
           break;
         case 'stats':
-          prompt = `Provide detailed statistical analysis for ${gameInfo}. Use Google search to gather comprehensive team and player statistics including offensive/defensive metrics, individual player performances, team comparisons, and advanced analytics that tell the story of this game.`;
+          prompt = `As a professional collegiate and NFL analyst, provide detailed statistical analysis for ${gameInfo} from the current season only. Use Google search to gather comprehensive team and player statistics including offensive/defensive metrics, individual player performances, team comparisons, and advanced analytics that tell the story of this game from the current season. Provide expert insights on what these statistics reveal about team performance, coaching decisions, and game strategy. Focus specifically on current season data and avoid referencing previous seasons.`;
           break;
         default:
           prompt = `Please provide information about ${gameInfo}.`;

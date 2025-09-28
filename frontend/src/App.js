@@ -194,7 +194,7 @@ function Dashboard({ activeTab, setActiveTab }) {
                   <Trophy className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-black dark:text-white">Football AI</h1>
+                  <h1 className="text-xl font-bold text-black dark:text-white">BoothBrain</h1>
                   <p className="text-sm text-gray-700 dark:text-gray-300">Powered by AI Analytics</p>
                 </div>
               </div>
@@ -312,7 +312,7 @@ function Dashboard({ activeTab, setActiveTab }) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 drop-shadow-lg">
-            AI-Powered Football Analytics
+            AI-Powered Sports Analytics
           </h2>
           <p className="text-xl text-white mb-8 max-w-3xl mx-auto opacity-90">
             Get instant insights, stats, and fun facts about your favorite {activeTab.toUpperCase()} games. 
@@ -341,7 +341,7 @@ function Dashboard({ activeTab, setActiveTab }) {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
               <h3 className="text-2xl font-bold text-black dark:text-white">
-                Recent Football Games for Week {currentWeek}
+                Recent Games for Week {currentWeek}
               </h3>
               {/* League Tabs */}
               <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -433,10 +433,10 @@ function Dashboard({ activeTab, setActiveTab }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold text-black dark:text-white mb-4">
-              Why Choose Football AI?
+              Why Choose BoothBrain?
             </h3>
             <p className="text-lg text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">
-              Experience football like never before with our AI-powered platform
+              Experience sports like never before with our AI-powered platform
             </p>
           </div>
 

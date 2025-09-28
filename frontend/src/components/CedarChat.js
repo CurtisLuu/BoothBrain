@@ -28,6 +28,16 @@ const CedarChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-scroll to most recent message when chat expands
+  useEffect(() => {
+    if (isExpanded && messages.length > 0) {
+      // Small delay to ensure the chat is fully rendered
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [isExpanded, messages.length]);
+
   // Process message queue
   useEffect(() => {
     const processQueue = async () => {
@@ -122,6 +132,12 @@ const CedarChat = () => {
           content: message.trim(), 
           timestamp: new Date().toISOString() 
         }]);
+        
+        // Clear the input box after processing
+        setInputValue('');
+        
+        // Ensure we scroll to the most recent message
+        scrollToLatestMessage();
       }
     };
 
@@ -276,6 +292,12 @@ const CedarChat = () => {
     setMessageQueue([]);
     setIsProcessingQueue(false);
     setIsLoading(false);
+  };
+
+  const scrollToLatestMessage = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const copyMessage = (content) => {
@@ -648,13 +670,17 @@ const CedarChat = () => {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  onFocus={() => !isExpanded && setIsExpanded(true)}
+                  onFocus={() => {
+                    if (!isExpanded) {
+                      setIsExpanded(true);
+                      scrollToLatestMessage();
+                    }
+                  }}
                   placeholder="Ask a question..."
                   className={`w-full bg-transparent border-none ${isDarkMode ? 'text-white placeholder-gray-400' : 'text-gray-900 placeholder-gray-500'} focus:outline-none text-sm h-full flex items-center`}
                   style={{
                     boxShadow: 'inset 0 0 4px rgba(59, 130, 246, 0.1)'
                   }}
-                  disabled={isLoading}
                 />
               </div>
               

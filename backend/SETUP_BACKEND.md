@@ -108,7 +108,7 @@ python main.py
 
 ## 📁 **File Structure**
 ```
-football.ai/
+BoothBrain/
 ├── backend/                 # Python backend
 │   ├── main.py             # FastAPI app
 │   ├── start.py            # Startup script

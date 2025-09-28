@@ -1,15 +1,30 @@
-# 🏈 Football AI - Advanced Sports Analytics Platform
+# 🏈 BoothBrain - Advanced Sports Analytics Platform
 
-A comprehensive sports analytics platform featuring team management, game statistics, schedule tracking, and advanced PDF editing capabilities.
+A comprehensive AI-powered sports analytics platform featuring real-time game analysis, team management, interactive chat, and advanced PDF editing capabilities.
 
 ## 🚀 Features
 
+### 🤖 **AI-Powered Analytics**
+- **Intelligent Chat Interface**: Ask questions about games, players, and statistics
+- **Professional Analysis**: AI acts as collegiate and NFL analyst
+- **Real-time Insights**: Get instant analysis of current season games
+- **Radial Menu**: Quick access to game summaries, player analysis, highlights, and stats
+- **Web Search Integration**: AI searches for latest game information and statistics
+
 ### 📊 **Core Features**
 - **Team Management**: Comprehensive team rosters and statistics
-- **Game Statistics**: Detailed game analysis and performance metrics
+- **Game Statistics**: Detailed game analysis and performance metrics with demo data
 - **Schedule Management**: Interactive schedule viewing and management
+- **Live Game Data**: Real-time NFL and NCAA game information
 - **Dark Mode**: Full dark/light theme support
 - **Responsive Design**: Mobile-friendly interface
+
+### 💬 **Interactive Chat System**
+- **Instant Response**: Zero-delay chat expansion and message processing
+- **Message Queue**: Handles multiple concurrent requests seamlessly
+- **Professional Prompts**: Pre-configured analysis requests for games
+- **Auto-scroll**: Always shows most recent conversation
+- **Session Management**: Persistent chat sessions
 
 ### 📄 **PDF Editor Features**
 - **Multiple PDF Processing Technologies**:
@@ -27,21 +42,33 @@ A comprehensive sports analytics platform featuring team management, game statis
 ## 🏗️ Project Structure
 
 ```
-football.ai/
+BoothBrain/
 ├── frontend/                 # React frontend application
 │   ├── src/
 │   │   ├── components/       # React components
-│   │   ├── contexts/         # React contexts (DarkMode)
+│   │   │   ├── CedarChat.js  # AI chat interface
+│   │   │   ├── RadialMenu.js # Game analysis menu
+│   │   │   ├── GameStatsPage.js # Game statistics
+│   │   │   ├── TeamPageEnhanced.js # Team management
+│   │   │   └── SchedulePage.js # Schedule management
+│   │   ├── contexts/         # React contexts
+│   │   │   ├── DarkModeContext.js # Theme management
+│   │   │   └── SearchContext.js # Search functionality
 │   │   ├── services/         # API services
+│   │   │   ├── footballApi.js # Sports data API
+│   │   │   ├── chatApi.js    # AI chat API
+│   │   │   └── sportsApi.js  # ESPN API integration
 │   │   └── utils/           # Utility functions
 │   ├── public/              # Static assets
 │   └── package.json         # Frontend dependencies
 ├── backend/                 # Python backend services
-│   ├── main.py             # Main PyMuPDF backend
-│   ├── main_alt.py         # Alternative pdf2image backend
+│   ├── main.py             # Main FastAPI backend
+│   ├── main_alt.py         # Alternative backend
 │   ├── requirements.txt    # Python dependencies
-│   ├── uploads/            # PDF file storage
+│   ├── uploads/            # File storage
 │   └── start_backend.bat   # Windows startup script
+├── start.bat               # Windows startup script
+├── start.sh                # Linux/macOS startup script
 └── README.md               # This file
 ```
 
@@ -138,6 +165,31 @@ backend/start_backend.bat
    - **Stats**: Game statistics and analysis
    - **Import**: PDF upload and editing
 
+### **AI Chat Features**
+
+#### **Using the Radial Menu**
+1. **Select a game** from the schedule or stats page
+2. **Right-click or long-press** on a game card
+3. **Choose from analysis options**:
+   - **Game Summary**: Comprehensive game analysis
+   - **Standout Players**: Top performer analysis
+   - **Highlights**: Key plays and moments
+   - **Stats**: Detailed statistical breakdown
+4. **Chat opens automatically** with professional analysis
+
+#### **Manual Chat Usage**
+1. **Click the chat input** at the bottom of the screen
+2. **Type your question** about any game, player, or statistic
+3. **Get instant AI analysis** with current season data
+4. **Ask follow-up questions** for deeper insights
+
+#### **Chat Features**
+- **Zero-delay response**: Instant chat expansion
+- **Message queue**: Handle multiple requests
+- **Auto-scroll**: Always see latest conversation
+- **Professional analysis**: AI acts as sports analyst
+- **Current season focus**: Only latest data
+
 ### **PDF Editor Usage**
 
 #### **PDF.js Editor (Recommended)**
@@ -166,6 +218,8 @@ backend/start_backend.bat
 - **PDF.js** - PDF rendering and editing
 - **Lucide React** - Icons
 - **html2pdf.js** - PDF generation
+- **Context API** - State management
+- **Custom Hooks** - Reusable logic
 
 ### **Backend**
 - **FastAPI** - Python web framework
@@ -173,26 +227,61 @@ backend/start_backend.bat
 - **pdf2image** - Alternative PDF processing
 - **Pillow** - Image processing
 - **Uvicorn** - ASGI server
+- **Google Gemini AI** - AI chat integration
+- **Web Search API** - Real-time data fetching
+
+### **AI & Data**
+- **Google Gemini AI** - Natural language processing
+- **ESPN API** - Live sports data
+- **Web Search Integration** - Current season information
+- **Message Queue System** - Concurrent request handling
 
 ## 📁 Key Components
 
 ### **Frontend Components**
-- `App.js` - Main application component
+- `App.js` - Main application component with AI chat integration
+- `CedarChat.js` - AI chat interface with message queue system
+- `RadialMenu.js` - Game analysis radial menu
+- `GameStatsPage.js` - Game statistics with demo data generation
 - `TeamPageEnhanced.js` - Team management interface
 - `SchedulePage.js` - Schedule viewing and management
-- `GameStatsPage.js` - Game statistics and analysis
+- `GameCard.js` - Individual game display cards
 - `ImportPage.js` - PDF upload and editor selection
 - `PDFJSEditor.js` - Frontend PDF editor (PDF.js)
 - `BackendPDFEditor.js` - Backend PDF editor interface
 
+### **Context Providers**
+- `DarkModeContext.js` - Theme management
+- `SearchContext.js` - Global search functionality
+
+### **API Services**
+- `footballApi.js` - Sports data API integration
+- `chatApi.js` - AI chat API communication
+- `sportsApi.js` - ESPN API integration
+
 ### **Backend Services**
-- `main.py` - PyMuPDF-based PDF processing
-- `main_alt.py` - pdf2image-based PDF processing
+- `main.py` - FastAPI backend with AI integration
+- `main_alt.py` - Alternative backend implementation
 - `requirements.txt` - Python dependencies
 
 ## 🚨 Troubleshooting
 
 ### **Common Issues**
+
+#### **AI Chat Not Responding**
+- **Solution**: Check if backend is running (required for AI features)
+- **Alternative**: Use demo data mode for statistics
+- **Check**: Ensure Google Gemini API is configured
+
+#### **Radial Menu Not Working**
+- **Solution**: Right-click or long-press on game cards
+- **Check**: Ensure game data is loaded
+- **Alternative**: Use manual chat input
+
+#### **Message Queue Issues**
+- **Solution**: Clear chat queue using the "Clear Queue" button
+- **Check**: Refresh the page if messages get stuck
+- **Reset**: Clear browser storage if persistent issues
 
 #### **PDF Editor Not Working**
 - **Solution**: Use the PDF.js editor (frontend-only)
@@ -213,6 +302,11 @@ backend/start_backend.bat
   rm -rf node_modules package-lock.json
   npm install
   ```
+
+#### **AI Analysis Not Current**
+- **Solution**: Ensure prompts specify "current season only"
+- **Check**: AI should search for latest data
+- **Reset**: Clear chat and try again
 
 ## 🔄 Development
 
@@ -237,6 +331,20 @@ backend/start_backend.bat
 - `GET /get-annotations/{file_id}` - Retrieve annotations
 - `GET /export-pdf/{file_id}` - Export modified PDF
 
+### **AI Chat API**
+- `POST /chat/session` - Create new chat session
+- `POST /chat/message` - Send message to AI
+- `POST /chat/clear` - Clear chat session
+- `GET /chat/session/{session_id}` - Get session details
+
+### **Sports Data API**
+- `GET /games/nfl` - Get NFL games
+- `GET /games/ncaa` - Get NCAA games
+- `GET /games/{game_id}/summary` - Get game summary
+- `GET /games/{game_id}/boxscore` - Get game boxscore
+- `GET /teams/{team_id}/roster` - Get team roster
+- `GET /teams/{team_id}/stats` - Get team statistics
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -258,4 +366,15 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ for sports analytics and PDF editing**
+**Built with ❤️ for AI-powered sports analytics and PDF editing**
+
+## 🎯 Key Features Summary
+
+- **🤖 AI-Powered Analysis**: Professional sports analysis with Google Gemini AI
+- **💬 Interactive Chat**: Zero-delay chat with message queue system
+- **🎯 Radial Menu**: Quick game analysis with right-click/long-press
+- **📊 Live Data**: Real-time NFL and NCAA game information
+- **📄 PDF Editing**: Advanced PDF editing with multiple technologies
+- **🌙 Dark Mode**: Full theme support
+- **📱 Responsive**: Mobile-friendly design
+- **⚡ Fast**: Optimized performance with concurrent request handling
