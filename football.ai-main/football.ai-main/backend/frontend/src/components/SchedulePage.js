@@ -1,194 +1,189 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, Clock, MapPin, Filter, ChevronDown, Upload } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Trophy, BarChart3, Home, Search, Moon, Sun, Calendar, MapPin, Filter, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import footballApi from '../services/footballApi';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useSearch } from '../contexts/SearchContext';
 
 const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [activePage, setActivePage] = useState('schedule');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [availableTeams, setAvailableTeams] = useState([]);
 
+  // Helper function to extract week number from week string
+  const extractWeekNumber = (weekString) => {
+    if (!weekString) return 0;
+    const match = weekString.toString().match(/Week (\d+)/);
+    return match ? parseInt(match[1]) : 0;
+  };
 
-  // Load initial games
-  useEffect(() => {
-    loadGames();
-  }, [activeLeague]);
-
-  // Reload games when team selection changes
-  useEffect(() => {
-    if (availableTeams.length > 0) {
-      loadGames();
+  // Helper function to format date for display (user-friendly format)
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString || dateString === 'TBD') return 'TBD';
+    
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Check if it's today, tomorrow, or yesterday
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Tomorrow';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        // Format as "Day, Month Date" (e.g., "Monday, Oct 15")
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    } catch (error) {
+      return dateString; // Return original if parsing fails
     }
-  }, [selectedTeam]);
+  };
 
-  // Load games function
-  const loadGames = async () => {
+  // Load games function - Enhanced with systematic week-by-week fetching
+  const loadGames = useCallback(async () => {
     setLoading(true);
     try {
-      // Get comprehensive game data from API
-      const [currentWeekData, previousWeekData, nextWeekData] = await Promise.all([
-        activeLeague === 'nfl' ? footballApi.getNFLGames() : footballApi.getNCAAGames(),
-        activeLeague === 'nfl' ? footballApi.getPreviousWeekNFLGames() : footballApi.getPreviousWeekNCAAGames(),
-        activeLeague === 'nfl' ? footballApi.getNextWeekNFLGames() : footballApi.getNextWeekNCAAGames()
-      ]);
+      console.log(`=== LOADING SCHEDULE GAMES ===`);
+      console.log(`League: ${activeLeague}, Selected Team: ${selectedTeam}`);
       
-      // Extract unique teams for filter
+      let allGames = [];
+      
+      if (selectedTeam === 'all') {
+        // For "all teams" view, use systematic week-by-week fetching
+        console.log('Fetching all games using systematic week-by-week approach...');
+        
+        // Get current week to know how many weeks to fetch
+        const currentWeek = await footballApi.getCurrentWeek(activeLeague);
+        console.log(`Current week: ${currentWeek}`);
+        
+        // Fetch all weeks from 1 to current week + 4 (to get future games)
+        const maxWeek = Math.min(currentWeek + 4, activeLeague === 'nfl' ? 18 : 12);
+        console.log(`Fetching weeks 1 through ${maxWeek}...`);
+        
+        for (let week = 1; week <= maxWeek; week++) {
+          console.log(`Fetching week ${week} games...`);
+          try {
+            const weekGames = activeLeague === 'nfl' 
+              ? await footballApi.getNFLGamesByWeek(week) 
+              : await footballApi.getNCAAGamesByWeek(week);
+            
+            console.log(`Week ${week} games: ${weekGames.length}`);
+            
+            // Add week information to each game
+            const weekGamesWithInfo = weekGames.map(game => ({
+              ...game,
+              weekType: week < currentWeek ? 'previous' : week === currentWeek ? 'current' : 'next',
+              week: `Week ${week}`,
+              weekNumber: week
+            }));
+            
+            allGames = [...allGames, ...weekGamesWithInfo];
+            
+            // Add a small delay to avoid rate limiting
+            if (week < maxWeek) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (weekError) {
+            console.error(`Error fetching week ${week}:`, weekError);
+            // Continue with next week
+          }
+        }
+        
+        console.log(`Total games fetched: ${allGames.length}`);
+        
+      } else {
+        // For specific team view, use the team-specific systematic approach
+        console.log(`Fetching games for specific team: ${selectedTeam}`);
+        const teamGames = await footballApi.getTeamGames(selectedTeam, activeLeague);
+        
+        // Combine past and future games with proper week categorization
+        // Note: currentWeek calculation removed as it's not used in this context
+        
+        allGames = [
+          ...teamGames.pastGames.map(game => ({
+            ...game,
+            weekType: 'previous',
+            week: game.week || 'Previous Week',
+            weekNumber: extractWeekNumber(game.week)
+          })),
+          ...teamGames.futureGames.map(game => ({
+            ...game,
+            weekType: 'next',
+            week: game.week || 'Next Week',
+            weekNumber: extractWeekNumber(game.week)
+          }))
+        ];
+        
+        console.log(`Team games fetched: ${allGames.length} (${teamGames.pastGames.length} past, ${teamGames.futureGames.length} future)`);
+      }
+      
+      // Extract unique teams for filter from all games
       const teams = new Set();
-      [...currentWeekData, ...previousWeekData, ...nextWeekData].forEach(game => {
+      allGames.forEach(game => {
         teams.add(game.homeTeam);
         teams.add(game.awayTeam);
       });
       setAvailableTeams(['all', ...Array.from(teams).sort()]);
       
-      // Combine all games with proper categorization
-      const allGames = [
-        ...previousWeekData.map(game => ({ ...game, weekType: 'previous', week: 'Previous Week' })),
-        ...currentWeekData.map(game => ({ ...game, weekType: 'current', week: 'Current Week' })),
-        ...nextWeekData.map(game => ({ ...game, weekType: 'next', week: 'Next Week' }))
-      ];
+      // Sort games by week number and date
+      allGames.sort((a, b) => {
+        // First sort by week number
+        const weekA = a.weekNumber || 0;
+        const weekB = b.weekNumber || 0;
+        if (weekA !== weekB) return weekA - weekB;
+        
+        // Then sort by original date within the week (use originalDate if available)
+        const dateA = new Date(a.originalDate || a.date);
+        const dateB = new Date(b.originalDate || b.date);
+        return dateA - dateB;
+      });
       
-      // If no team selected or 'all' selected, show all games
-      if (selectedTeam === 'all') {
-        setGames(allGames);
-      } else {
-        // Generate comprehensive season for selected team
-        const teamSeasonGames = generateComprehensiveTeamSchedule(selectedTeam, allGames, activeLeague);
-        setGames(teamSeasonGames);
-      }
+      setGames(allGames);
       
     } catch (error) {
       console.error('Error loading games:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeLeague, selectedTeam]);
 
+  // Load initial games
+  useEffect(() => {
+    loadGames();
+  }, [loadGames]);
 
-  // Generate past date for mock data
-  const getPastDate = (weeksAgo) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (weeksAgo * 7));
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Generate future date for mock data
-  const getFutureDate = (weeksAhead) => {
-    const date = new Date();
-    date.setDate(date.getDate() + (weeksAhead * 7));
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Generate comprehensive season schedule for a specific team
-  const generateComprehensiveTeamSchedule = (teamName, allGamesData, league) => {
-    const seasonGames = [];
-    const totalWeeks = league === 'nfl' ? 18 : 12; // NFL has 18 weeks, NCAA has 12 weeks
-    
-    // Get all teams from API data for opponents
-    const allTeams = new Set();
-    allGamesData.forEach(game => {
-      allTeams.add(game.homeTeam);
-      allTeams.add(game.awayTeam);
-    });
-    const teamList = Array.from(allTeams).filter(team => team !== teamName);
-    
-    // Generate games for each week with past games first
-    for (let week = 1; week <= totalWeeks; week++) {
-      // Determine if this is a past, current, or future week
-      const currentDate = new Date();
-      const gameDate = new Date();
-      gameDate.setDate(currentDate.getDate() + ((week - 9) * 7)); // Week 9 is current week
-      
-      const isPastWeek = week < 9;
-      const isCurrentWeek = week === 9;
-      const isFutureWeek = week > 9;
-      
-      // Select opponent (cycle through teams)
-      const opponent = teamList[(week - 1) % teamList.length];
-      
-      // Determine home/away (alternate)
-      const isHome = week % 2 === 1;
-      const homeTeam = isHome ? teamName : opponent;
-      const awayTeam = isHome ? opponent : teamName;
-      
-      // Generate realistic scores and status based on week
-      let homeScore, awayScore, status, time, weekType;
-      
-      if (isPastWeek) {
-        // Past games - completed with realistic scores
-        homeScore = Math.floor(Math.random() * 35) + 10;
-        awayScore = Math.floor(Math.random() * 35) + 10;
-        status = 'Final';
-        time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
-        weekType = 'previous';
-      } else if (isCurrentWeek) {
-        // Current week - might be live or upcoming
-        const isLive = Math.random() > 0.3; // 70% chance of being live
-        if (isLive) {
-          homeScore = Math.floor(Math.random() * 28) + 7;
-          awayScore = Math.floor(Math.random() * 28) + 7;
-          status = 'Live';
-          time = '4:25 PM ET';
-        } else {
-          homeScore = 0;
-          awayScore = 0;
-          status = 'Upcoming';
-          time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
-        }
-        weekType = 'current';
-      } else {
-        // Future games - no scores yet
-        homeScore = 0;
-        awayScore = 0;
-        status = 'Upcoming';
-        time = Math.random() > 0.5 ? '1:00 PM ET' : '4:25 PM ET';
-        weekType = 'next';
-      }
-      
-      const game = {
-        id: `${teamName}-week-${week}`,
-        homeTeam,
-        awayTeam,
-        homeScore,
-        awayScore,
-        status,
-        time,
-        date: gameDate.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric'
-        }),
-        week: `Week ${week}`,
-        weekType,
-        league: league
-      };
-      
-      seasonGames.push(game);
+  // Reload games when team selection changes
+  useEffect(() => {
+    if (availableTeams.length > 0) {
+      loadGames();
     }
-    
-    // Sort games to show past games first, then current, then future
-    return seasonGames.sort((a, b) => {
-      const weekA = parseInt(a.week.replace('Week ', ''));
-      const weekB = parseInt(b.week.replace('Week ', ''));
-      return weekA - weekB; // Past games (lower week numbers) first
-    });
-  };
+  }, [selectedTeam, availableTeams.length, loadGames]);
+
 
 
   // Filter games by team
@@ -230,69 +225,27 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
       grouped[date].push(game);
     });
     
-    // Sort dates chronologically (past dates first)
+    // Sort dates chronologically (past dates first) using original dates for sorting
     const sortedDates = Object.keys(grouped).sort((a, b) => {
       if (a === 'TBD') return 1;
       if (b === 'TBD') return -1;
-      return new Date(a) - new Date(b);
+      
+      // Use original date if available, otherwise use the date string
+      const dateA = grouped[a][0]?.originalDate || a;
+      const dateB = grouped[b][0]?.originalDate || b;
+      return new Date(dateA) - new Date(dateB);
     });
     
+    // Create grouped object with user-friendly date formatting
     const sortedGrouped = {};
     sortedDates.forEach(date => {
-      sortedGrouped[date] = grouped[date];
+      const userFriendlyDate = formatDateForDisplay(date);
+      sortedGrouped[userFriendlyDate] = grouped[date];
     });
     
     return sortedGrouped;
   };
 
-  // Generate search suggestions
-  const generateSuggestions = (query) => {
-    if (query.length < 2) return [];
-    
-    const allTeams = new Set();
-    games.forEach(game => {
-      allTeams.add(game.homeTeam);
-      allTeams.add(game.awayTeam);
-    });
-    
-    return Array.from(allTeams)
-      .filter(team => team.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 5);
-  };
-
-  // Handle search input change
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  // Find team league
-  const findTeamLeague = (teamName) => {
-    const game = games.find(game => 
-      game.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
-      game.awayTeam.toLowerCase().includes(teamName.toLowerCase())
-    );
-    return game ? game.league : activeLeague;
-  };
-
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  // Handle search form submit
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   // Navigation functions
   const navigateToHome = () => {
@@ -310,10 +263,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
     navigate('/schedule');
   };
 
-  const navigateToImport = () => {
-    setActivePage('import');
-    navigate('/import');
-  };
 
   // Handle game click
   const handleGameClick = (game) => {
@@ -325,7 +274,7 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
@@ -375,17 +324,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
-                </button>
-                <button
-                  onClick={navigateToImport}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                    activePage === 'import' 
-                      ? 'bg-primary-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Import</span>
                 </button>
               </div>
 
@@ -451,7 +389,7 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
       </header>
 
       {/* Filter Controls */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -610,10 +548,6 @@ const SchedulePage = ({ activeLeague, setActiveLeague }) => {
                         </div>
 
                         <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{game.time}</span>
-                          </div>
                           <div className="flex items-center space-x-1">
                             <MapPin className="w-4 h-4" />
                             <span>{game.week}</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar, Upload } from 'lucide-react';
+import { Trophy, BarChart3, Star, RefreshCw, Moon, Sun, Search, Home, Calendar } from 'lucide-react';
 import GameCard from './components/GameCard';
 import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
@@ -9,19 +9,27 @@ import ImportPage from './components/ImportPage';
 import CedarChat from './components/CedarChat';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
+import { SearchProvider, useSearch } from './contexts/SearchContext';
 
 // Main Dashboard Component
 function Dashboard({ activeTab, setActiveTab }) {
   const navigate = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    searchSuggestions, 
+    showSuggestions, 
+    setShowSuggestions,
+    handleSearchInputChange,
+    handleSuggestionClick,
+    handleSearch
+  } = useSearch();
   const [nflGames, setNflGames] = useState([]);
   const [ncaaGames, setNcaaGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activePage, setActivePage] = useState('home');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load games when component mounts or tab changes
   useEffect(() => {
@@ -61,6 +69,38 @@ function Dashboard({ activeTab, setActiveTab }) {
 
   const currentGames = activeTab === 'nfl' ? nflGames : ncaaGames;
 
+  // Format date for display
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString || dateString === 'TBD') return 'TBD';
+    
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Check if it's today, tomorrow, or yesterday
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Tomorrow';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+      } else {
+        // Format as "Day, Month Date" (e.g., "Monday, Oct 15")
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    } catch (error) {
+      return dateString; // Return original if parsing fails
+    }
+  };
+
   // Group games by date
   const groupGamesByDate = (games) => {
     const grouped = games.reduce((acc, game) => {
@@ -72,16 +112,21 @@ function Dashboard({ activeTab, setActiveTab }) {
       return acc;
     }, {});
 
-    // Sort dates and return as array of {date, games}
+    // Sort dates and return as array of {date, games, displayDate}
     return Object.keys(grouped)
       .sort((a, b) => {
         // Sort by date, with 'TBD' at the end
         if (a === 'TBD') return 1;
         if (b === 'TBD') return -1;
-        return new Date(a) - new Date(b);
+        
+        // Use original date if available, otherwise use the date string
+        const dateA = grouped[a][0]?.originalDate || a;
+        const dateB = grouped[b][0]?.originalDate || b;
+        return new Date(dateA) - new Date(dateB);
       })
       .map(date => ({
         date,
+        displayDate: formatDateForDisplay(date),
         games: grouped[date].sort((a, b) => {
           // Sort games within each date by time
           const timeA = a.time || '';
@@ -100,7 +145,9 @@ function Dashboard({ activeTab, setActiveTab }) {
     // Find the most common week in the games
     const weekCounts = games.reduce((acc, game) => {
       const week = game.week || 'Week 1';
-      const weekNumber = week.replace('Week ', '');
+      // Ensure week is a string before calling replace
+      const weekString = String(week);
+      const weekNumber = weekString.replace('Week ', '');
       acc[weekNumber] = (acc[weekNumber] || 0) + 1;
       return acc;
     }, {});
@@ -115,65 +162,6 @@ function Dashboard({ activeTab, setActiveTab }) {
 
   const currentWeek = getCurrentWeek(currentGames);
 
-  // Generate search suggestions
-  const generateSuggestions = (query) => {
-    if (!query || query.length < 2) {
-      setSearchSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    const allGames = [...nflGames, ...ncaaGames];
-    const teamNames = new Set();
-    
-    allGames.forEach(game => {
-      if (game.homeTeam && game.homeTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.homeTeam);
-      }
-      if (game.awayTeam && game.awayTeam.toLowerCase().includes(query.toLowerCase())) {
-        teamNames.add(game.awayTeam);
-      }
-    });
-
-    const suggestions = Array.from(teamNames).slice(0, 5);
-    setSearchSuggestions(suggestions);
-    setShowSuggestions(suggestions.length > 0);
-  };
-
-  // Handle search input change
-  const handleSearchInputChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    generateSuggestions(value);
-  };
-
-  // Find team league from games data
-  const findTeamLeague = (teamName) => {
-    const allGames = [...nflGames, ...ncaaGames];
-    const game = allGames.find(game => 
-      (game.homeTeam && game.homeTeam.toLowerCase().includes(teamName.toLowerCase())) ||
-      (game.awayTeam && game.awayTeam.toLowerCase().includes(teamName.toLowerCase()))
-    );
-    return game ? game.league : 'nfl'; // Default to NFL if not found
-  };
-
-  // Handle suggestion click
-  const handleSuggestionClick = (teamName) => {
-    setSearchQuery(teamName);
-    setShowSuggestions(false);
-    const league = findTeamLeague(teamName);
-    navigate('/team', { state: { team: { name: teamName, league } } });
-  };
-
-  // Handle search form submit (Enter key)
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setShowSuggestions(false);
-      const league = findTeamLeague(searchQuery.trim());
-      navigate('/team', { state: { team: { name: searchQuery.trim(), league } } });
-    }
-  };
 
   // Navigation functions
   const navigateToStats = () => {
@@ -186,10 +174,6 @@ function Dashboard({ activeTab, setActiveTab }) {
     navigate('/schedule');
   };
 
-  const navigateToImport = () => {
-    setActivePage('import');
-    navigate('/import');
-  };
 
   const navigateToHome = () => {
     setActivePage('home');
@@ -201,7 +185,7 @@ function Dashboard({ activeTab, setActiveTab }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
@@ -215,21 +199,6 @@ function Dashboard({ activeTab, setActiveTab }) {
                 </div>
               </div>
 
-              {/* League Tabs - Only on Home Page */}
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveTab('nfl')}
-                  className={`tab-button ${activeTab === 'nfl' ? 'active' : 'inactive'}`}
-                >
-                  NFL
-                </button>
-                <button
-                  onClick={() => setActiveTab('ncaa')}
-                  className={`tab-button ${activeTab === 'ncaa' ? 'active' : 'inactive'}`}
-                >
-                  NCAA
-                </button>
-              </div>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -267,17 +236,6 @@ function Dashboard({ activeTab, setActiveTab }) {
                 >
                   <Calendar className="w-4 h-4" />
                   <span>Schedule</span>
-                </button>
-                <button
-                  onClick={navigateToImport}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-colors rounded-md ${
-                    activePage === 'import' 
-                      ? 'bg-primary-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Import</span>
                 </button>
               </div>
 
@@ -381,9 +339,34 @@ function Dashboard({ activeTab, setActiveTab }) {
       <section className="py-12 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-bold text-black dark:text-white">
-              {activeTab === 'nfl' ? `Recent NFL Games for Week ${currentWeek}` : `Recent NCAA Games for Week ${currentWeek}`}
-            </h3>
+            <div className="flex items-center space-x-4">
+              <h3 className="text-2xl font-bold text-black dark:text-white">
+                Recent Football Games for Week {currentWeek}
+              </h3>
+              {/* League Tabs */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveTab('nfl')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'nfl' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                  }`}
+                >
+                  NFL
+                </button>
+                <button
+                  onClick={() => setActiveTab('ncaa')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'ncaa' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                  }`}
+                >
+                  NCAA
+                </button>
+              </div>
+            </div>
             <div className="flex items-center space-x-4">
               {lastUpdated && (
                 <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -424,12 +407,12 @@ function Dashboard({ activeTab, setActiveTab }) {
             </div>
           ) : (
             <div className="space-y-8">
-              {groupedGames.map(({ date, games }) => (
+              {groupedGames.map(({ date, displayDate, games }) => (
                 <div key={date} className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
                     <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-300 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                      {date}
+                      {displayDate}
                     </h4>
                     <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
                   </div>
