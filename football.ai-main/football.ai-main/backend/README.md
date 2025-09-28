@@ -62,6 +62,8 @@ pip install -r requirements.txt
 - `PyMuPDF==1.23.8` - PDF processing
 - `Pillow==10.1.0` - Image processing
 - `python-multipart==0.0.6` - File upload support
+- `google-genai==0.3.0` - Gemini AI integration
+- `python-dotenv==1.0.0` - Environment variable management
 
 ### **pdf2image Backend**
 ```bash
@@ -103,6 +105,9 @@ sudo apt-get install poppler-utils
 - `GET /get-annotations/{file_id}` - Retrieve annotations
 - `GET /export-pdf/{file_id}` - Export modified PDF
 
+### **NFL Expert AI Endpoints**
+- `POST /ask-nfl-expert` - Ask Gemini AI NFL expert questions
+
 ### **Request/Response Examples**
 
 #### **Upload PDF**
@@ -134,6 +139,21 @@ curl "http://localhost:8000/pdf-page/{file_id}/0"
     "width": 595.0,
     "height": 842.0
   }
+}
+```
+
+#### **Ask NFL Expert**
+```bash
+curl -X POST "http://localhost:8000/ask-nfl-expert" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who are the top quarterbacks this season?"}'
+```
+
+**Response:**
+```json
+{
+  "answer": "Based on current performance and statistics...",
+  "question": "Who are the top quarterbacks this season?"
 }
 ```
 
@@ -193,7 +213,11 @@ Create `.env` file:
 UPLOAD_DIR=uploads
 MAX_FILE_SIZE=10485760  # 10MB
 ALLOWED_ORIGINS=http://localhost:3000
+GENAI_API_KEY=your_gemini_api_key_here
 ```
+
+**Required for NFL Expert AI:**
+- `GENAI_API_KEY` - Your Google Gemini API key (get from [Google AI Studio](https://makersuite.google.com/app/apikey))
 
 ### **File Storage**
 - **Upload Directory**: `uploads/`

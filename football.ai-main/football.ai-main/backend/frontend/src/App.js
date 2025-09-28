@@ -6,6 +6,7 @@ import GameStatsPage from './components/GameStatsPage';
 import TeamPage from './components/TeamPageEnhanced';
 import SchedulePage from './components/SchedulePage';
 import ImportPage from './components/ImportPage';
+import CedarChat from './components/CedarChat';
 import footballApi from './services/footballApi';
 import { DarkModeProvider, useDarkMode } from './contexts/DarkModeContext';
 
@@ -508,6 +509,8 @@ function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/team" element={<TeamPage />} />
         </Routes>
+        {/* Cedar Chat - Available on all pages */}
+        <CedarChat />
       </Router>
     </DarkModeProvider>
   );

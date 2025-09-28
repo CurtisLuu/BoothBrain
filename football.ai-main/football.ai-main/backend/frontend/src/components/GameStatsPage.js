@@ -51,130 +51,27 @@ const AllStatisticsSection = ({ selectedGame, teamStats }) => {
         console.log('⚠️ Missing game ID or league, using mock data');
       }
       
-      // If we got real data, use it; otherwise fall back to mock data
+      // Only use real data from API - no mock data
       if (realPlayerStats.length > 0) {
         console.log('🎉 Using real player statistics from API');
         setPlayerStats(realPlayerStats);
       } else {
-        console.log('🎭 Using mock player statistics as fallback');
-        const mockPlayerStats = generateMockPlayerStats(selectedGame);
-        console.log('🎭 Generated mock players:', mockPlayerStats.length);
-        setPlayerStats(mockPlayerStats);
+        console.log('⚠️ No real player statistics available');
+        setPlayerStats([]);
       }
       
     } catch (err) {
       console.error('💥 Error loading player statistics:', err);
       setError('Failed to load player statistics');
-      
-      // Even if there's an error, try to show mock data as fallback
-      try {
-        const mockPlayerStats = generateMockPlayerStats(selectedGame);
-        setPlayerStats(mockPlayerStats);
-        setError(null); // Clear error since we have fallback data
-        console.log('🆘 Fallback mock data generated successfully');
-      } catch (mockError) {
-        console.error('💀 Even mock data generation failed:', mockError);
-      }
+      setPlayerStats([]);
     } finally {
       setLoading(false);
       console.log('🏁 AllStatisticsSection: loadPlayerStatistics finished');
     }
   };
 
-  const generateMockPlayerStats = (game) => {
-    const positions = ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'CB', 'S', 'K', 'P'];
-    const teams = [game.awayTeam, game.homeTeam];
-    const players = [];
 
-    teams.forEach(team => {
-      positions.forEach((position, index) => {
-        const playerNumber = Math.floor(Math.random() * 99) + 1;
-        const playerName = generatePlayerName();
-        
-        players.push({
-          id: `${team}-${position}-${index}`,
-          name: playerName,
-          position: position,
-          team: team,
-          jersey: playerNumber,
-          seasonStats: generatePositionStats(position, 'season'),
-          careerStats: generatePositionStats(position, 'career'),
-          gameStats: game.status === 'Scheduled' || game.status === 'Pre-Game' 
-            ? generatePositionStats(position, 'game', true) 
-            : generatePositionStats(position, 'game')
-        });
-      });
-    });
-
-    return players;
-  };
-
-  const generatePlayerName = () => {
-    const firstNames = ['John', 'Mike', 'Chris', 'David', 'James', 'Robert', 'Michael', 'William', 'Richard', 'Thomas'];
-    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
-    
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    
-    return `${firstName} ${lastName}`;
-  };
-
-  const generatePositionStats = (position, type, isZero = false) => {
-    if (isZero) {
-      return {
-        passingYards: 0, passingTDs: 0, passingINTs: 0,
-        rushingYards: 0, rushingTDs: 0,
-        receivingYards: 0, receivingTDs: 0, receptions: 0,
-        tackles: 0, sacks: 0, interceptions: 0, fumbles: 0
-      };
-    }
-
-    const baseMultiplier = type === 'career' ? 3 : type === 'season' ? 1.5 : 1;
-    
-    switch (position) {
-      case 'QB':
-        return {
-          passingYards: Math.floor(Math.random() * 3000 * baseMultiplier) + 1000,
-          passingTDs: Math.floor(Math.random() * 25 * baseMultiplier) + 5,
-          passingINTs: Math.floor(Math.random() * 10 * baseMultiplier) + 1,
-          rushingYards: Math.floor(Math.random() * 200 * baseMultiplier) + 50,
-          rushingTDs: Math.floor(Math.random() * 5 * baseMultiplier) + 1
-        };
-      case 'RB':
-        return {
-          rushingYards: Math.floor(Math.random() * 1000 * baseMultiplier) + 500,
-          rushingTDs: Math.floor(Math.random() * 10 * baseMultiplier) + 3,
-          receivingYards: Math.floor(Math.random() * 300 * baseMultiplier) + 100,
-          receivingTDs: Math.floor(Math.random() * 3 * baseMultiplier) + 1,
-          receptions: Math.floor(Math.random() * 30 * baseMultiplier) + 10
-        };
-      case 'WR':
-      case 'TE':
-        return {
-          receivingYards: Math.floor(Math.random() * 800 * baseMultiplier) + 300,
-          receivingTDs: Math.floor(Math.random() * 8 * baseMultiplier) + 2,
-          receptions: Math.floor(Math.random() * 50 * baseMultiplier) + 20
-        };
-      case 'LB':
-      case 'DL':
-        return {
-          tackles: Math.floor(Math.random() * 80 * baseMultiplier) + 30,
-          sacks: Math.floor(Math.random() * 8 * baseMultiplier) + 2,
-          fumbles: Math.floor(Math.random() * 3 * baseMultiplier) + 1
-        };
-      case 'CB':
-      case 'S':
-        return {
-          tackles: Math.floor(Math.random() * 60 * baseMultiplier) + 20,
-          interceptions: Math.floor(Math.random() * 5 * baseMultiplier) + 1,
-          fumbles: Math.floor(Math.random() * 2 * baseMultiplier) + 1
-        };
-      default:
-        return {
-          tackles: Math.floor(Math.random() * 20 * baseMultiplier) + 5
-        };
-    }
-  };
+  
 
   if (loading) {
     return (
@@ -396,6 +293,8 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
   const [loading, setLoading] = useState(false);
   const [gameDataLoading, setGameDataLoading] = useState(false);
   const [apiDetailedStats, setApiDetailedStats] = useState(null);
+  const [quarterbackStats, setQuarterbackStats] = useState(null);
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [activePage, setActivePage] = useState('stats');
@@ -664,6 +563,102 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     return String(value);
   };
 
+  // Function to load quarterback stats from Gemini AI
+  const loadQuarterbackStats = async (game) => {
+    try {
+      console.log('🏈 Loading quarterback stats from Gemini AI for game:', game.id);
+      
+      const response = await fetch('http://localhost:8000/quarterback-stats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: game.id,
+          away_team: game.awayTeam,
+          home_team: game.homeTeam,
+          league: game.league
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Quarterback stats loaded:', data);
+      setQuarterbackStats(data.quarterback_stats);
+      
+    } catch (error) {
+      console.error('❌ Error loading quarterback stats:', error);
+      setQuarterbackStats(null);
+    }
+  };
+
+  // Function to load game summary from Gemini AI
+  const loadGameSummaryFromGemini = async (game) => {
+    try {
+      console.log('📊 Loading game summary from Gemini AI for game:', game.id);
+      
+      const response = await fetch('http://localhost:8000/game-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: game.id,
+          away_team: game.awayTeam,
+          home_team: game.homeTeam,
+          league: game.league
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Game summary loaded from Gemini:', data);
+      return data.game_summary;
+      
+    } catch (error) {
+      console.error('❌ Error loading game summary from Gemini:', error);
+      return null;
+    }
+  };
+
+  // Function to load game details from Gemini AI
+  const loadGameDetailsFromGemini = async (game) => {
+    try {
+      console.log('🔍 Loading game details from Gemini AI for game:', game.id);
+      
+      const response = await fetch('http://localhost:8000/game-details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          game_id: game.id,
+          away_team: game.awayTeam,
+          home_team: game.homeTeam,
+          league: game.league
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Game details loaded from Gemini:', data);
+      return data.game_details;
+      
+    } catch (error) {
+      console.error('❌ Error loading game details from Gemini:', error);
+      return null;
+    }
+  };
+
   // Function to load comprehensive data for a selected game
   const loadGameData = async (game) => {
     if (!game || !game.id) {
@@ -684,12 +679,12 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       
       // Load multiple data sources in parallel
       const [gameSummary, gameBoxscore, gameDetails, teamStats] = await Promise.all([
-        // Get game summary with player stats
-        footballApi.getGameSummary(game.id, game.league),
-        // Get comprehensive game boxscore with all player statistics
+        // Get game summary from Gemini AI instead of ESPN
+        loadGameSummaryFromGemini(game),
+        // Get comprehensive game boxscore with all player statistics (still from ESPN)
         footballApi.getGameBoxscore(game.id, game.league),
-        // Get detailed game data from ESPN Core API
-        footballApi.getGameDetails(game.id, game.league),
+        // Get detailed game data from Gemini AI instead of ESPN
+        loadGameDetailsFromGemini(game),
         // Get team season stats
         loadTeamSeasonStats(game)
       ]);
@@ -729,6 +724,9 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       
       setApiDetailedStats(combinedStats);
       console.log('✅ Comprehensive game data loaded:', combinedStats);
+      
+      // Also load quarterback stats from Gemini AI
+      await loadQuarterbackStats(game);
       
     } catch (error) {
       console.error('❌ Error loading game data:', error);
@@ -794,6 +792,33 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       console.log('Selected game changed, loading data for:', selectedGame.id);
       loadGameData(selectedGame);
     }
+  }, [selectedGame]);
+
+  // Auto-refresh effect for live games
+  useEffect(() => {
+    let refreshInterval = null;
+    
+    // Only auto-refresh for live games
+    if (selectedGame && selectedGame.status === 'Live') {
+      console.log('🔄 Setting up auto-refresh for live game:', selectedGame.id);
+      
+      // Refresh every 30 seconds for live games
+      refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing live game data...');
+        setIsAutoRefreshing(true);
+        loadGameData(selectedGame).finally(() => {
+          setIsAutoRefreshing(false);
+        });
+      }, 30000); // 30 seconds
+    }
+    
+    // Cleanup interval on unmount or when selectedGame changes
+    return () => {
+      if (refreshInterval) {
+        console.log('🛑 Clearing auto-refresh interval');
+        clearInterval(refreshInterval);
+      }
+    };
   }, [selectedGame]);
 
 
@@ -947,7 +972,7 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
     return biggestGames.slice(0, maxGames);
   };
 
-  // Generate detailed stats data (mock or from API)
+  // Get detailed stats data (only from API)
   const getDetailedStats = (game) => {
     if (!game) return null;
     
@@ -956,71 +981,8 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
       return apiDetailedStats;
     }
     
-    // If game is scheduled (not started yet), return all zeros
-    if (game.status === 'Scheduled' || game.status === 'Pre-Game') {
-      return {
-        homeTeam: {
-          name: game.homeTeam,
-          score: 0,
-          stats: {
-            totalYards: 0,
-            passingYards: 0,
-            rushingYards: 0,
-            turnovers: 0,
-            timeOfPossession: '00:00',
-            firstDowns: 0,
-            penalties: 0,
-            penaltyYards: 0
-          }
-        },
-        awayTeam: {
-          name: game.awayTeam,
-          score: 0,
-          stats: {
-            totalYards: 0,
-            passingYards: 0,
-            rushingYards: 0,
-            turnovers: 0,
-            timeOfPossession: '00:00',
-            firstDowns: 0,
-            penalties: 0,
-            penaltyYards: 0
-          }
-        }
-      };
-    }
-    
-    // For live or final games, return mock stats
-    return {
-      homeTeam: {
-        name: game.homeTeam,
-        score: game.homeScore,
-        stats: {
-          totalYards: Math.floor(Math.random() * 200) + 300,
-          passingYards: Math.floor(Math.random() * 150) + 200,
-          rushingYards: Math.floor(Math.random() * 100) + 50,
-          turnovers: Math.floor(Math.random() * 3),
-          timeOfPossession: `${Math.floor(Math.random() * 10) + 25}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-          firstDowns: Math.floor(Math.random() * 10) + 15,
-          penalties: Math.floor(Math.random() * 8) + 2,
-          penaltyYards: Math.floor(Math.random() * 50) + 20
-        }
-      },
-      awayTeam: {
-        name: game.awayTeam,
-        score: game.awayScore,
-        stats: {
-          totalYards: Math.floor(Math.random() * 200) + 300,
-          passingYards: Math.floor(Math.random() * 150) + 200,
-          rushingYards: Math.floor(Math.random() * 100) + 50,
-          turnovers: Math.floor(Math.random() * 3),
-          timeOfPossession: `${Math.floor(Math.random() * 10) + 25}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-          firstDowns: Math.floor(Math.random() * 10) + 15,
-          penalties: Math.floor(Math.random() * 8) + 2,
-          penaltyYards: Math.floor(Math.random() * 50) + 20
-        }
-      }
-    };
+    // Return null if no API data is available - no mock data
+    return null;
   };
 
   const baseDetailedStats = getDetailedStats(selectedGame);
@@ -1650,6 +1612,12 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                   <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading data...</span>
                                 </div>
                               )}
+                              {isAutoRefreshing && (
+                                <div className="ml-3 flex items-center">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                  <span className="ml-2 text-sm text-green-600 dark:text-green-400">Live updating...</span>
+                                </div>
+                              )}
                             </h2>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
                               <span>{selectedGame.week}</span>
@@ -1663,9 +1631,11 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                   : selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game'
                                   ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : selectedGame.status === 'Live'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 animate-pulse'
                                   : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                               }`}>
-                                {selectedGame.status}
+                                {selectedGame.status === 'Live' ? '🔴 LIVE' : selectedGame.status}
                               </span>
                             </div>
                           </div>
@@ -1970,22 +1940,15 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Offense</h4>
                         <div className="space-y-1 text-sm">
                           {(() => {
-                            // Get players for this team from API data
-                            const teamPlayers = detailedStats?.players?.filter(player => 
-                              player.team === selectedGame.awayTeam
-                            ) || [];
-                            
-                            // If no API data, show mock data
-                            if (teamPlayers.length === 0) {
+                            // Show quarterback stats from Gemini AI if available
+                            if (quarterbackStats?.away_team) {
+                              const qb = quarterbackStats.away_team;
                               return (
                                 <>
                                   <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">QB - John Smith</span>
+                                    <span className="text-gray-600 dark:text-gray-300">QB - {qb.quarterback_name}</span>
                                     <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0/0, 0 yds, 0 TD' 
-                                        : '24/38, 287 yds, 2 TD'
-                                      }
+                                      {qb.completions}/{qb.attempts}, {qb.passing_yards} yds, {qb.completion_percentage.toFixed(1)}%
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -2019,20 +1982,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               );
                             }
                             
-                            // Show real player data from API
-                            return teamPlayers.slice(0, 4).map((player, index) => (
-                              <div key={index} className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-300">
-                                  {player.position} - {player.name}
-                                </span>
-                                <span className="text-gray-900 dark:text-white">
-                                  {player.gameStats ? 
-                                    `${player.gameStats.passingCompletions || 0}/${player.gameStats.passingAttempts || 0}, ${player.gameStats.passingYards || 0} yds, ${player.gameStats.passingTouchdowns || 0} TD` :
-                                    '0/0, 0 yds, 0 TD'
+                            // Show message when no real data is available
+                            return (
+                              <div className="text-center py-4">
+                                <div className="text-gray-500 dark:text-gray-400 text-sm">
+                                  {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                    ? 'Game statistics will be available once the game starts'
+                                    : 'Player statistics are being loaded from live data sources'
                                   }
-                                </span>
+                                </div>
                               </div>
-                            ));
+                            );
                           })()}
                         </div>
                       </div>
@@ -2048,38 +2008,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               ['LB', 'CB', 'DE', 'DT', 'S'].includes(player.position)
                             ) || [];
                             
-                            // If no API data, show mock data
+                            // If no API data, show message
                             if (teamPlayers.length === 0) {
                               return (
-                                <>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">LB - Tom Brown</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 sacks' 
-                                        : '12 tackles, 1 sack'
-                                      }
-                                    </span>
+                                <div className="text-center py-4">
+                                  <div className="text-gray-500 dark:text-gray-400 text-sm">
+                                    {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                      ? 'Defensive statistics will be available once the game starts'
+                                      : 'Defensive statistics are being loaded from live data sources'
+                                    }
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">CB - Sam Green</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 INT' 
-                                        : '8 tackles, 1 INT'
-                                      }
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">DE - Rob White</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 sacks' 
-                                        : '6 tackles, 2 sacks'
-                                      }
-                                    </span>
-                                  </div>
-                                </>
+                                </div>
                               );
                             }
                             
@@ -2115,22 +2054,15 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Offense</h4>
                         <div className="space-y-1 text-sm">
                           {(() => {
-                            // Get players for this team from API data
-                            const teamPlayers = detailedStats?.players?.filter(player => 
-                              player.team === selectedGame.homeTeam
-                            ) || [];
-                            
-                            // If no API data, show mock data
-                            if (teamPlayers.length === 0) {
+                            // Show quarterback stats from Gemini AI if available
+                            if (quarterbackStats?.home_team) {
+                              const qb = quarterbackStats.home_team;
                               return (
                                 <>
                                   <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">QB - David Lee</span>
+                                    <span className="text-gray-600 dark:text-gray-300">QB - {qb.quarterback_name}</span>
                                     <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0/0, 0 yds, 0 TD' 
-                                        : '19/32, 245 yds, 1 TD'
-                                      }
+                                      {qb.completions}/{qb.attempts}, {qb.passing_yards} yds, {qb.completion_percentage.toFixed(1)}%
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -2164,20 +2096,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               );
                             }
                             
-                            // Show real player data from API
-                            return teamPlayers.slice(0, 4).map((player, index) => (
-                              <div key={index} className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-300">
-                                  {player.position} - {player.name}
-                                </span>
-                                <span className="text-gray-900 dark:text-white">
-                                  {player.gameStats ? 
-                                    `${player.gameStats.passingCompletions || 0}/${player.gameStats.passingAttempts || 0}, ${player.gameStats.passingYards || 0} yds, ${player.gameStats.passingTouchdowns || 0} TD` :
-                                    '0/0, 0 yds, 0 TD'
+                            // Show message when no real data is available
+                            return (
+                              <div className="text-center py-4">
+                                <div className="text-gray-500 dark:text-gray-400 text-sm">
+                                  {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                    ? 'Game statistics will be available once the game starts'
+                                    : 'Player statistics are being loaded from live data sources'
                                   }
-                                </span>
+                                </div>
                               </div>
-                            ));
+                            );
                           })()}
                         </div>
                       </div>
@@ -2193,38 +2122,17 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                               ['LB', 'CB', 'DE', 'DT', 'S'].includes(player.position)
                             ) || [];
                             
-                            // If no API data, show mock data
+                            // If no API data, show message
                             if (teamPlayers.length === 0) {
                               return (
-                                <>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">LB - Kevin Moore</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 sacks' 
-                                        : '10 tackles, 1 sack'
-                                      }
-                                    </span>
+                                <div className="text-center py-4">
+                                  <div className="text-gray-500 dark:text-gray-400 text-sm">
+                                    {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
+                                      ? 'Defensive statistics will be available once the game starts'
+                                      : 'Defensive statistics are being loaded from live data sources'
+                                    }
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">CB - Ryan King</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 INT' 
-                                        : '7 tackles, 2 INT'
-                                      }
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-300">DE - Paul Miller</span>
-                                    <span className="text-gray-900 dark:text-white">
-                                      {(selectedGame.status === 'Scheduled' || selectedGame.status === 'Pre-Game') 
-                                        ? '0 tackles, 0 sacks' 
-                                        : '5 tackles, 1 sack'
-                                      }
-                                    </span>
-                                  </div>
-                                </>
+                                </div>
                               );
                             }
                             
@@ -2261,24 +2169,6 @@ const GameStatsPage = ({ activeLeague, setActiveLeague }) => {
                 </div>
               </div>
 
-              {/* Chat Box */}
-              <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  <MessageCircle className="w-5 h-5 text-primary-600" />
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">AI Chat</h4>
-                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 px-2 py-1 rounded-full">
-                    Cedar Framework Coming Soon
-                  </span>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 min-h-[120px] flex items-center justify-center">
-                  <div className="text-center">
-                    <MessageCircle className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                      AI-powered chat interface will be integrated here using the Cedar framework
-                    </p>
-                  </div>
-                </div>
-              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
